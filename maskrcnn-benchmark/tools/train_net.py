@@ -53,23 +53,27 @@ def train(cfg, local_rank, distributed):
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
 
-    data_loader = make_data_loader(
+    data_loader_train = make_data_loader(
         cfg,
         is_train=True,
         is_distributed=distributed,
         start_iter=arguments["iteration"],
     )
+    data_loaders_valid = make_data_loader(cfg, is_train=False, is_distributed=distributed)
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
+    validation_period = cfg.SOLVER.VALIDATION_PERIOD
 
     do_train(
         model,
-        data_loader,
+        data_loader_train,
+        data_loaders_valid[0],
         optimizer,
         scheduler,
         checkpointer,
         device,
         checkpoint_period,
+        validation_period,
         arguments,
     )
 

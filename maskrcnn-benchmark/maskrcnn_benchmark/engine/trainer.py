@@ -2,6 +2,7 @@
 import datetime
 import logging
 import time
+from tqdm import tqdm
 
 import torch
 from torch.distributed import deprecated as dist
@@ -41,26 +42,28 @@ def reduce_loss_dict(loss_dict):
 
 def do_train(
     model,
-    data_loader,
+    data_loader_train,
+    data_loaders_valid,
     optimizer,
     scheduler,
     checkpointer,
     device,
     checkpoint_period,
+    validation_period,
     arguments,
 ):
     logger = logging.getLogger("maskrcnn_benchmark.trainer")
     logger.info("Start training")
     meters = MetricLogger(delimiter="  ")
     tensorboard_path = os.path.join('../output/tensorboard', cfg.EXP.NAME)
-    tensorboard_logger = TensorboardXLogger(log_dir=tensorboard_path, is_training=True)
+    tensorboard_logger = TensorboardXLogger(log_dir=tensorboard_path)
 
-    max_iter = len(data_loader)
+    max_iter = len(data_loader_train)
     start_iter = arguments["iteration"]
     model.train()
     start_training_time = time.time()
     end = time.time()
-    for iteration, (images, targets, _) in enumerate(data_loader, start_iter):
+    for iteration, (images, targets, _) in enumerate(data_loader_train, start_iter):
         data_time = time.time() - end
         arguments["iteration"] = iteration
 
@@ -76,7 +79,7 @@ def do_train(
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = reduce_loss_dict(loss_dict)
         losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-        meters.update(loss=losses_reduced, **loss_dict_reduced)
+        meters.update(total_loss=losses_reduced, **loss_dict_reduced)
 
         optimizer.zero_grad()
         losses.backward()
@@ -89,7 +92,7 @@ def do_train(
         eta_seconds = meters.time.global_avg * (max_iter - iteration)
         eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
 
-        tensorboard_logger.write(meters, iteration)
+        tensorboard_logger.write(meters, iteration, phase='Train')
 
 
         if iteration % 20 == 0 or iteration == (max_iter - 1):
@@ -110,6 +113,11 @@ def do_train(
                     memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
                 )
             )
+
+        if iteration % validation_period == 0:
+            validation(model, data_loaders_valid, device, logger, tensorboard_logger, iteration)
+
+
         if iteration % checkpoint_period == 0 and iteration > 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
 
@@ -121,3 +129,62 @@ def do_train(
             total_time_str, total_training_time / (max_iter)
         )
     )
+    tensorboard_logger.export_to_json()
+
+
+def validation(
+    model,
+    data_loader,
+    device,
+    logger,
+    tensorboard_logger,
+    iteration
+):
+    logger.info('-' * 40)
+    logger.info("Start Validation")
+    meters = MetricLogger(delimiter="  ")
+    start_validation_time = time.time()
+
+    max_iter = len(data_loader)
+
+
+    for idx, batch in enumerate(tqdm(data_loader)):
+        if idx > 20:
+            break
+        images, targets, _ = batch
+        images = images.to(device)
+        targets = [target.to(device) for target in targets]
+
+        loss_dict = model(images, targets)
+
+
+        # reduce losses over all GPUs for logging purposes
+        loss_dict_reduced = reduce_loss_dict(loss_dict)
+        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+        meters.update(total_loss=losses_reduced, **loss_dict_reduced)
+
+
+    tensorboard_logger.write(meters, iteration, phase='Valid')
+    logger.info('Validation:')
+    logger.info(
+                meters.delimiter.join(
+                    [
+                        "iter: {iter}",
+                        "{meters}",
+                        "max mem: {memory:.0f}",
+                    ]
+                ).format(
+                    iter=iteration,
+                    meters=str(meters),
+                    memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
+                )
+            )
+
+    total_validation_time = time.time() - start_validation_time
+    total_time_str = str(datetime.timedelta(seconds=total_validation_time))
+    logger.info(
+        "Total Validation time: {} ({:.4f} s / it)".format(
+            total_time_str, total_validation_time / (max_iter)
+        )
+    )
+    logger.info('-' * 40)
