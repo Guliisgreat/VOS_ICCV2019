@@ -114,7 +114,7 @@ def do_train(
                 )
             )
 
-        if iteration % validation_period == 0:
+        if iteration % validation_period == 0 and iteration > 0:
             validation(model, data_loaders_valid, device, logger, tensorboard_logger, iteration)
 
 
@@ -149,8 +149,6 @@ def validation(
 
 
     for idx, batch in enumerate(tqdm(data_loader)):
-        if idx > 20:
-            break
         images, targets, _ = batch
         images = images.to(device)
         targets = [target.to(device) for target in targets]

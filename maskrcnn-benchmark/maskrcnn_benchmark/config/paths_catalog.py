@@ -21,11 +21,30 @@ class DatasetCatalog(object):
             "coco/val2014",
             "coco/annotations/instances_valminusminival2014.json",
         ),
+        "DAVIS_train": (
+            "DAVIS",
+            "DAVIS/Annotations/instancesonly_480p_train.json",
+        ),
+        "DAVIS_valid": (
+            "DAVIS",
+            "DAVIS/Annotations/instancesonly_480p_val.json",
+        )
     }
 
     @staticmethod
     def get(name):
         if "coco" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                root=os.path.join(data_dir, attrs[0]),
+                ann_file=os.path.join(data_dir, attrs[1]),
+            )
+            return dict(
+                factory="COCODataset",
+                args=args,
+            )
+        elif "DAVIS" in name:
             data_dir = DatasetCatalog.DATA_DIR
             attrs = DatasetCatalog.DATASETS[name]
             args = dict(
