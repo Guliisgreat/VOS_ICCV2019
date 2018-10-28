@@ -6,9 +6,13 @@ import time
 import torch
 from torch.distributed import deprecated as dist
 
+
 from maskrcnn_benchmark.utils.comm import get_world_size
 from maskrcnn_benchmark.utils.metric_logger import MetricLogger
+from maskrcnn_benchmark.utils.tensorboard_logger import TensorboardXLogger
 
+from maskrcnn_benchmark.config import cfg
+import os
 
 def reduce_loss_dict(loss_dict):
     """
@@ -48,6 +52,9 @@ def do_train(
     logger = logging.getLogger("maskrcnn_benchmark.trainer")
     logger.info("Start training")
     meters = MetricLogger(delimiter="  ")
+    tensorboard_path = os.path.join('../output/tensorboard', cfg.EXP.NAME)
+    tensorboard_logger = TensorboardXLogger(log_dir=tensorboard_path, is_training=True)
+
     max_iter = len(data_loader)
     start_iter = arguments["iteration"]
     model.train()
@@ -81,6 +88,9 @@ def do_train(
 
         eta_seconds = meters.time.global_avg * (max_iter - iteration)
         eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+
+        tensorboard_logger.write(meters, iteration)
+
 
         if iteration % 20 == 0 or iteration == (max_iter - 1):
             logger.info(
