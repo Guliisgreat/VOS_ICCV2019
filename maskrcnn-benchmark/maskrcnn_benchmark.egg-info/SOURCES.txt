@@ -1,0 +1,12 @@
+README.md
+setup.py
+/home/guli/maskrcnn_pytorch_benchmarrk/maskrcnn-benchmark/maskrcnn_benchmark/csrc/vision.cpp
+/home/guli/maskrcnn_pytorch_benchmarrk/maskrcnn-benchmark/maskrcnn_benchmark/csrc/cpu/ROIAlign_cpu.cpp
+/home/guli/maskrcnn_pytorch_benchmarrk/maskrcnn-benchmark/maskrcnn_benchmark/csrc/cpu/nms_cpu.cpp
+/home/guli/maskrcnn_pytorch_benchmarrk/maskrcnn-benchmark/maskrcnn_benchmark/csrc/cuda/ROIAlign_cuda.cu
+/home/guli/maskrcnn_pytorch_benchmarrk/maskrcnn-benchmark/maskrcnn_benchmark/csrc/cuda/ROIPool_cuda.cu
+/home/guli/maskrcnn_pytorch_benchmarrk/maskrcnn-benchmark/maskrcnn_benchmark/csrc/cuda/nms.cu
+maskrcnn_benchmark.egg-info/PKG-INFO
+maskrcnn_benchmark.egg-info/SOURCES.txt
+maskrcnn_benchmark.egg-info/dependency_links.txt
+maskrcnn_benchmark.egg-info/top_level.txt
