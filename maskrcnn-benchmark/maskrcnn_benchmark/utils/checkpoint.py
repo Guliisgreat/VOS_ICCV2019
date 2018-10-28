@@ -94,7 +94,10 @@ class Checkpointer(object):
         return torch.load(f, map_location=torch.device("cpu"))
 
     def _load_model(self, checkpoint):
-        load_state_dict(self.model, checkpoint.pop("model"))
+        if "model" in checkpoint:
+            load_state_dict(self.model, checkpoint.pop("model"))
+        else:
+            load_state_dict(self.model, checkpoint)
 
 
 class DetectronCheckpointer(Checkpointer):
