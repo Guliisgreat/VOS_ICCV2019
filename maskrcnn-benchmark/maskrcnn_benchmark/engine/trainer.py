@@ -85,6 +85,8 @@ def do_train(
         losses.backward()
         optimizer.step()
 
+        meters.update(lr=optimizer.param_groups[0]["lr"])
+
         batch_time = time.time() - end
         end = time.time()
         meters.update(time=batch_time, data=data_time)
@@ -95,21 +97,19 @@ def do_train(
         tensorboard_logger.write(meters, iteration, phase='Train')
 
 
-        if iteration % 20 == 0 or iteration == (max_iter - 1):
+        if iteration % (validation_period / 10) == 0 or iteration == (max_iter - 1):
             logger.info(
                 meters.delimiter.join(
                     [
                         "eta: {eta}",
                         "iter: {iter}",
                         "{meters}",
-                        "lr: {lr:.6f}",
                         "max mem: {memory:.0f}",
                     ]
                 ).format(
                     eta=eta_string,
                     iter=iteration,
                     meters=str(meters),
-                    lr=optimizer.param_groups[0]["lr"],
                     memory=torch.cuda.max_memory_allocated() / 1024.0 / 1024.0,
                 )
             )
