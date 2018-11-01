@@ -39,9 +39,9 @@ def compute_on_dataset(model, data_loader, device):
     return results_dict
 
 
-def prepare_for_coco_detection(predictions, dataset):
+def prepare_for_davis_detection(predictions, dataset):
     # assert isinstance(dataset, COCODataset)
-    coco_results = []
+    davis_results = []
     for image_id, prediction in enumerate(predictions):
         original_id = dataset.id_to_img_map[image_id]
         if len(prediction) == 0:
@@ -59,7 +59,7 @@ def prepare_for_coco_detection(predictions, dataset):
 
         mapped_labels = [dataset.contiguous_category_id_to_json_id[i] for i in labels]
 
-        coco_results.extend(
+        davis_results.extend(
             [
                 {
                     "image_id": original_id,
@@ -70,10 +70,10 @@ def prepare_for_coco_detection(predictions, dataset):
                 for k, box in enumerate(boxes)
             ]
         )
-    return coco_results
+    return davis_results
 
 
-def prepare_for_coco_segmentation(predictions, dataset):
+def prepare_for_davis_segmentation(predictions, dataset):
     import pycocotools.mask as mask_util
     import numpy as np
 
@@ -349,11 +349,13 @@ def check_expected_results(results, expected_results, sigma_tol):
             logger.info(msg)
 
 
-def inference(
+
+
+
+def inference_davis(
     model,
     data_loader,
     iou_types=("bbox",),
-    box_only=False,
     device="cuda",
     expected_results=(),
     expected_results_sigma_tol=4,
@@ -367,7 +369,7 @@ def inference(
         if torch.distributed.deprecated.is_initialized()
         else 1
     )
-    logger = logging.getLogger("maskrcnn_benchmark.inference")
+    logger = logging.getLogger("davis_maskrcnn.inference")
     dataset = data_loader.dataset
     logger.info("Start evaluation on {} images".format(len(dataset)))
     start_time = time.time()
@@ -389,45 +391,28 @@ def inference(
     if output_folder:
         torch.save(predictions, os.path.join(output_folder, "predictions.pth"))
 
-    if box_only:
-        logger.info("Evaluating bbox proposals")
-        areas = {"all": "", "small": "s", "medium": "m", "large": "l"}
-        res = COCOResults("box_proposal")
-        for limit in [100, 1000]:
-            for area, suffix in areas.items():
-                stats = evaluate_box_proposals(
-                    predictions, dataset, area=area, limit=limit
-                )
-                key = "AR{}@{:d}".format(suffix, limit)
-                res.results["box_proposal"][key] = stats["ar"].item()
-        logger.info(res)
-        check_expected_results(res, expected_results, expected_results_sigma_tol)
-        if output_folder:
-            torch.save(res, os.path.join(output_folder, "box_proposals.pth"))
-        return
+
     logger.info("Preparing results for COCO format")
-    coco_results = {}
+    davis_results = {}
     if "bbox" in iou_types:
         logger.info("Preparing bbox results")
-        coco_results["bbox"] = prepare_for_coco_detection(predictions, dataset)
+        davis_results["bbox"] = prepare_for_davis_detection(predictions, dataset)
     if "segm" in iou_types:
         logger.info("Preparing segm results")
-        coco_results["segm"] = prepare_for_coco_segmentation(predictions, dataset)
+        davis_results["segm"] = prepare_for_davis_segmentation(predictions, dataset)
 
-    results = COCOResults(*iou_types)
-    logger.info("Evaluating predictions")
-    for iou_type in iou_types:
-        with tempfile.NamedTemporaryFile() as f:
-            file_path = f.name
-            if output_folder:
-                file_path = os.path.join(output_folder, iou_type + ".json")
-            res = evaluate_predictions_on_coco(
-                dataset.coco, coco_results[iou_type], file_path, iou_type
-            )
-            results.update(res)
-    logger.info(results)
-    check_expected_results(results, expected_results, expected_results_sigma_tol)
-    if output_folder:
-        torch.save(results, os.path.join(output_folder, "coco_results.pth"))
-
-
+    # results = COCOResults(*iou_types)
+    # logger.info("Evaluating predictions")
+    # for iou_type in iou_types:
+    #     with tempfile.NamedTemporaryFile() as f:
+    #         file_path = f.name
+    #         if output_folder:
+    #             file_path = os.path.join(output_folder, iou_type + ".json")
+    #         res = evaluate_predictions_on_coco(
+    #             dataset.coco, davis_results[iou_type], file_path, iou_type
+    #         )
+    #         results.update(res)
+    # logger.info(results)
+    # check_expected_results(results, expected_results, expected_results_sigma_tol)
+    # if output_folder:
+    #     torch.save(results, os.path.join(output_folder, "coco_results.pth"))

@@ -52,7 +52,7 @@ def do_train(
     validation_period,
     arguments,
 ):
-    logger = logging.getLogger("maskrcnn_benchmark.trainer")
+    logger = logging.getLogger("DAVIS_MaskRCNN_baseline_training")
     logger.info("Start training")
     meters = MetricLogger(delimiter="  ")
     tensorboard_path = os.path.join('../output/tensorboard', cfg.EXP.NAME)
@@ -118,7 +118,7 @@ def do_train(
             validation(model, data_loaders_valid, device, logger, tensorboard_logger, iteration)
 
 
-        if iteration % checkpoint_period == 0 and iteration > 0:
+        if iteration % checkpoint_period == 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
 
     checkpointer.save("model_{:07d}".format(iteration), **arguments)
@@ -153,13 +153,12 @@ def validation(
         images = images.to(device)
         targets = [target.to(device) for target in targets]
 
-        loss_dict = model(images, targets)
-
-
-        # reduce losses over all GPUs for logging purposes
-        loss_dict_reduced = reduce_loss_dict(loss_dict)
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
-        meters.update(total_loss=losses_reduced, **loss_dict_reduced)
+        with torch.no_grad():
+            loss_dict = model(images, targets)
+            # reduce losses over all GPUs for logging purposes
+            loss_dict_reduced = reduce_loss_dict(loss_dict)
+            losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+            meters.update(total_loss=losses_reduced, **loss_dict_reduced)
 
 
     tensorboard_logger.write(meters, iteration, phase='Valid')

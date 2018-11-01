@@ -2,7 +2,7 @@
 import logging
 import os
 import sys
-
+import time
 
 def setup_logger(name, save_dir, local_rank):
     logger = logging.getLogger(name)
@@ -16,8 +16,10 @@ def setup_logger(name, save_dir, local_rank):
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+    log_file = '{}.log'.format(time.strftime('%Y-%m-%d-%H-%M'))
+
     if save_dir:
-        fh = logging.FileHandler(os.path.join(save_dir, "log.txt"))
+        fh = logging.FileHandler(os.path.join(save_dir, log_file))
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
