@@ -19,12 +19,14 @@ class Checkpointer(object):
         save_dir="",
         save_to_disk=None,
         logger=None,
+        num_class=81,
     ):
         self.model = model
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.save_dir = save_dir
         self.save_to_disk = save_to_disk
+        self.num_class_in_model = num_class
         if logger is None:
             logger = logging.getLogger(__name__)
         self.logger = logger
@@ -50,16 +52,21 @@ class Checkpointer(object):
         self.tag_last_checkpoint(save_file)
 
     def load(self, f=None):
-        if self.has_checkpoint():
-            # override argument with existing checkpoint
-            f = self.get_checkpoint_file()
-        if not f:
-            # no checkpoint could be found
-            self.logger.info("No checkpoint found. Initializing model from scratch")
-            return {}
+        # if self.has_checkpoint():
+        #     # override argument with existing checkpoint
+        #     f = self.get_checkpoint_file()
+        # if not f:
+        #     # no checkpoint could be found
+        #     self.logger.info("No checkpoint found. Initializing model from scratch")
+        #     return {}
         self.logger.info("Loading checkpoint from {}".format(f))
         checkpoint = self._load_file(f)
-        self._load_model(checkpoint)
+        if self.check_shape_of_checkpoints(checkpoint):
+            self._load_model(checkpoint)
+        else:
+            self._load_model_except_class_layer(checkpoint)
+
+
         if "optimizer" in checkpoint and self.optimizer:
             self.logger.info("Loading optimizer from {}".format(f))
             self.optimizer.load_state_dict(checkpoint.pop("optimizer"))
@@ -99,6 +106,39 @@ class Checkpointer(object):
         else:
             load_state_dict(self.model, checkpoint)
 
+    def _load_model_except_class_layer(self, checkpoint):
+        if checkpoint['iteration'] >= 10000:
+            checkpoint['iteration'] = 0
+        if "model" in checkpoint:
+            saved_state_dict = checkpoint['model']
+        else:
+            saved_state_dict = checkpoint
+        new_params = self.model.state_dict().copy()
+        for i in saved_state_dict:
+            # 'module.roi_heads.mask.predictor.mask_fcn_logits.bias'
+            # 'module.roi_heads.box.predictor.cls_score.weight'
+            # 'module.roi_heads.box.predictor.bbox_pred.weight'
+
+            i_parts = i.split('.')
+            if (i_parts[2] == 'mask' and i_parts[4] == 'mask_fcn_logits') or \
+                    (i_parts[2] == 'box' and i_parts[4] == 'cls_score')  or \
+                    (i_parts[2] == 'box' and i_parts[4] == 'bbox_pred'):
+                continue
+            new_params['.'.join(i_parts)] = saved_state_dict[i]
+            print('.'.join(i_parts))
+
+        load_state_dict(self.model, new_params)
+
+
+
+
+    def check_shape_of_checkpoints(self, checkpoint):
+        num_class_in_checkpoints = \
+            checkpoint['model']['module.roi_heads.mask.predictor.mask_fcn_logits.weight'].shape
+        if num_class_in_checkpoints ==  self.num_class_in_model:
+            return True
+        else:
+            return False
 
 class DetectronCheckpointer(Checkpointer):
     def __init__(
