@@ -5,17 +5,26 @@ import os
 
 
 class DatasetCatalog(object):
-    DATA_DIR = "/home/guli/maskrcnn_pytorch_benchmarrk/maskrcnn-benchmark/datasets"
+    DATA_DIR = "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/datasets"
 
     DATASETS = {
         "coco_2014_train": (
             "coco/train2014",
             "coco/annotations/instances_train2014.json",
         ),
+        "coco_2014_train_binary": (
+            "coco/train2014",
+            "coco/annotations/instances_train2014_binary.json",
+        ),
         "coco_2014_val": ("coco/val2014", "coco/annotations/instances_val2014.json"),
+        "coco_2014_val_binary": ("coco/val2014", "coco/annotations/instances_val2014_binary.json"),
         "coco_2014_minival": (
             "coco/val2014",
             "coco/annotations/instances_minival2014.json",
+        ),
+        "coco_2014_minival_binary": (
+            "coco/val2014",
+            "coco/annotations/instances_minival2014_binary.json",
         ),
         "coco_2014_valminusminival": (
             "coco/val2014",
@@ -52,7 +61,7 @@ class DatasetCatalog(object):
                 ann_file=os.path.join(data_dir, attrs[1]),
             )
             return dict(
-                factory="COCODataset",
+                factory="DAVISDataset",
                 args=args,
             )
         raise RuntimeError("Dataset not available: {}".format(name))

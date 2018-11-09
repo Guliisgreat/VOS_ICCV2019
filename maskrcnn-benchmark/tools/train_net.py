@@ -42,7 +42,7 @@ def train(cfg, local_rank, distributed):
         )
 
     arguments = {}
-    arguments["iteration"] = 0
+
 
     output_dir = cfg.OUTPUT_DIR
 
@@ -50,7 +50,8 @@ def train(cfg, local_rank, distributed):
     # checkpointer = DetectronCheckpointer(
     #     cfg, model, optimizer, scheduler, output_dir, save_to_disk
     # )
-    checkpointer = Checkpointer(model,output_dir)
+    checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
+                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
 
@@ -64,21 +65,23 @@ def train(cfg, local_rank, distributed):
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
     validation_period = cfg.SOLVER.VALIDATION_PERIOD
+    if cfg.TEST.SKIP_TRAIN:
+        return model
+    else:
+        do_train(
+            model,
+            data_loader_train,
+            data_loaders_valid[0],
+            optimizer,
+            scheduler,
+            checkpointer,
+            device,
+            checkpoint_period,
+            validation_period,
+            arguments,
+        )
 
-    do_train(
-        model,
-        data_loader_train,
-        data_loaders_valid[0],
-        optimizer,
-        scheduler,
-        checkpointer,
-        device,
-        checkpoint_period,
-        validation_period,
-        arguments,
-    )
-
-    return model
+        return model
 
 
 def test(cfg, model, distributed):
@@ -152,7 +155,7 @@ def main():
     if output_dir:
         mkdir(output_dir)
 
-    logger = setup_logger("maskrcnn_benchmark", output_dir, args.local_rank)
+    logger = setup_logger("Training", output_dir, args.local_rank)
     logger.info("Using {} GPUs".format(num_gpus))
     logger.info(args)
 

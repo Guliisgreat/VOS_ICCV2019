@@ -20,6 +20,7 @@ class Checkpointer(object):
         save_to_disk=None,
         logger=None,
         num_class=81,
+        custom = False
     ):
         self.model = model
         self.optimizer = optimizer
@@ -30,6 +31,7 @@ class Checkpointer(object):
         if logger is None:
             logger = logging.getLogger(__name__)
         self.logger = logger
+        self.custom = custom
 
     def save(self, name, **kwargs):
         if not self.save_dir:
@@ -61,10 +63,21 @@ class Checkpointer(object):
         #     return {}
         self.logger.info("Loading checkpoint from {}".format(f))
         checkpoint = self._load_file(f)
-        if self.check_shape_of_checkpoints(checkpoint):
-            self._load_model(checkpoint)
-        else:
-            self._load_model_except_class_layer(checkpoint)
+        self._load_model(checkpoint)
+
+        # for j in self.model.state_dict().keys():
+        #     print(j)
+        #     print('-' * 20)
+        #
+        #
+        #
+        # if self.custom:
+        #     self._load_model_backbone_and_rpn(checkpoint)
+        # else:
+        #     if self.check_shape_of_checkpoints(checkpoint):
+        #         self._load_model(checkpoint)
+        #     else:
+        #         self._load_model_except_class_layer(checkpoint)
 
 
         if "optimizer" in checkpoint and self.optimizer:
@@ -129,12 +142,41 @@ class Checkpointer(object):
 
         load_state_dict(self.model, new_params)
 
+    def _load_model_part(self, saved_state_dict, name='backbone'):
+        for i in saved_state_dict:
+            # ''module.backbone.body.stem.conv1.weight'
+            i_parts = i.split('.')
+            if i_parts[0] == 'module' and i_parts[1] == name:
+                self.model.state_dict()['.'.join(i_parts)] = saved_state_dict[i]
+                print('.'.join(i_parts))
+            if i_parts[0] == name:
+                self.model.state_dict()['.'.join(i_parts)] = saved_state_dict[i]
+                print('.'.join(i_parts))
+        print('Load ' + name +' weight finished.')
+        print('-' * 20)
+
+
+    def _load_model_backbone_and_rpn(self, checkpoint):
+        if "model" in checkpoint:
+            saved_state_dict = checkpoint['model']
+        elif "state_dict" in checkpoint:
+            saved_state_dict = checkpoint["state_dict"]
+        else:
+            saved_state_dict = checkpoint
+        self._load_model_part(saved_state_dict, name='backbone')
+        self._load_model_part(saved_state_dict, name='rpn')
+
+
+
 
 
 
     def check_shape_of_checkpoints(self, checkpoint):
-        num_class_in_checkpoints = \
-            checkpoint['model']['module.roi_heads.mask.predictor.mask_fcn_logits.weight'].shape
+        if 'model' in checkpoint.keys():
+            num_class_in_checkpoints = \
+                checkpoint['model']['module.roi_heads.mask.predictor.mask_fcn_logits.weight'].shape[0]
+        else:
+            return True
         if num_class_in_checkpoints ==  self.num_class_in_model:
             return True
         else:

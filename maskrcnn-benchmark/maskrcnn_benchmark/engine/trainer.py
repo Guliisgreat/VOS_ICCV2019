@@ -52,7 +52,7 @@ def do_train(
     validation_period,
     arguments,
 ):
-    logger = logging.getLogger("DAVIS_MaskRCNN_baseline_training")
+    logger = logging.getLogger("Training")
     logger.info("Start training")
     meters = MetricLogger(delimiter="  ")
     tensorboard_path = os.path.join('../output/tensorboard', cfg.EXP.NAME)
@@ -118,7 +118,7 @@ def do_train(
             validation(model, data_loaders_valid, device, logger, tensorboard_logger, iteration)
 
 
-        if iteration % checkpoint_period == 0:
+        if iteration % checkpoint_period == 0 and iteration > 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)
 
     checkpointer.save("model_{:07d}".format(iteration), **arguments)
