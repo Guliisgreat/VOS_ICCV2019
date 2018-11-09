@@ -9,7 +9,7 @@ import os
 import torch
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
-from maskrcnn_benchmark.engine.inference import inference
+from maskrcnn_benchmark.engine.inference_davis import inference_davis
 from maskrcnn_benchmark.modeling.detector import build_detection_model
 from maskrcnn_benchmark.utils.checkpoint import Checkpointer
 from maskrcnn_benchmark.utils.collect_env import collect_env_info
@@ -20,13 +20,12 @@ from maskrcnn_benchmark.utils.miscellaneous import mkdir
 
 def main():
 
-    WEIGHT = "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/output/model_0000500.pth"
+    WEIGHT = "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/pretrained_weight/davis_model_0081000.pth"
 
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Inference")
     parser.add_argument(
         "--config-file",
-        default="/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/configs/"
-                "quick_schedules/e2e_mask_rcnn_R_50_FPN_quick_DAVIS.yaml",
+        default="/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/configs/davis/e2e_mask_rcnn_R_50_FPN_1x_davis.yaml",
         metavar="FILE",
         help="path to config file",
     )
@@ -65,7 +64,7 @@ def main():
     model.to(cfg.MODEL.DEVICE)
 
     checkpointer = Checkpointer(model)
-    _ = checkpointer.load( WEIGHT)
+    _ = checkpointer.load(WEIGHT)
 
     iou_types = ("bbox",)
     if cfg.MODEL.MASK_ON:
@@ -79,7 +78,7 @@ def main():
             output_folders[idx] = output_folder
     data_loaders_val = make_data_loader(cfg, is_train=False, is_distributed=distributed)
     for output_folder, data_loader_val in zip(output_folders, data_loaders_val):
-        inference(
+        inference_davis(
             model,
             data_loader_val,
             iou_types=iou_types,

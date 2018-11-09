@@ -9,15 +9,20 @@ from collections import OrderedDict
 import torch
 
 from tqdm import tqdm
+from PIL import Image
+import numpy as np
 
 from ..structures.bounding_box import BoxList
 from ..utils.comm import is_main_process
 from ..utils.comm import scatter_gather
 from ..utils.comm import synchronize
+from utils.visualization import visualize_batch_mask_for_debug
 
 
 from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
+from davis_components.inference import vote_pixelOfMask_for_annotation, extract_img_info
+
 
 
 def compute_on_dataset(model, data_loader, device):
@@ -25,7 +30,7 @@ def compute_on_dataset(model, data_loader, device):
     results_dict = {}
     cpu_device = torch.device("cpu")
     for i, batch in tqdm(enumerate(data_loader)):
-        if i > 20:
+        if i > 5:
             break
 
         images, targets, image_ids = batch
@@ -77,7 +82,7 @@ def prepare_for_davis_segmentation(predictions, dataset):
     import pycocotools.mask as mask_util
     import numpy as np
 
-    masker = Masker(threshold=0.5, padding=1)
+    masker = Masker(padding=1, keep_score=True)
     # assert isinstance(dataset, COCODataset)
     coco_results = []
     for image_id, prediction in tqdm(enumerate(predictions)):
@@ -94,7 +99,7 @@ def prepare_for_davis_segmentation(predictions, dataset):
         masks = masker(masks, prediction)
         # logger.info('Time mask: {}'.format(time.time() - t))
         # prediction = prediction.convert('xywh')
-
+        a = vote_pixelOfMask_for_annotation(masks, prediction)
         # boxes = prediction.bbox.tolist()
         scores = prediction.get_field("scores").tolist()
         labels = prediction.get_field("labels").tolist()
@@ -122,6 +127,52 @@ def prepare_for_davis_segmentation(predictions, dataset):
             ]
         )
     return coco_results
+
+
+def generate_davis_annotation(predictions, dataset, output_file):
+    import pycocotools.mask as mask_util
+    import numpy as np
+
+    masker = Masker(padding=1, keep_score=True)
+    # assert isinstance(dataset, COCODataset)
+    davis_results = []
+    for image_id, prediction in tqdm(enumerate(predictions)):
+        original_id = dataset.id_to_img_map[image_id]
+        if len(prediction) == 0:
+            continue
+
+        # TODO replace with get_img_info?
+        video_id, img_id = extract_img_info(dataset.coco.imgs[original_id]["seg_file_name"])
+        palette = Image.open(os.path.join(dataset.root, dataset.coco.imgs[original_id]["seg_file_name"])).getpalette()
+        image_width = dataset.coco.imgs[original_id]["width"]
+        image_height = dataset.coco.imgs[original_id]["height"]
+        prediction = prediction.resize((image_width, image_height))
+        masks = prediction.get_field("mask")
+        visualize_batch_mask_for_debug(masks, output_file)
+        # t = time.time()
+        masks = masker(masks, prediction)
+        # logger.info('Time mask: {}'.format(time.time() - t))
+        # prediction = prediction.convert('xywh')
+        a = vote_pixelOfMask_for_annotation(masks, prediction)
+        save_final_annotation(a, video_id, img_id, palette, output_file)
+
+
+
+
+def save_final_annotation(annotation, video_id, img_id, palette, dirname):
+    dir_video = os.path.join(dirname, video_id)
+    if not os.path.exists(dir_video):
+        os.mkdir(dir_video)
+    file_name = os.path.join(dir_video, img_id + '.png')
+
+    annotation = annotation.numpy()
+    if len(annotation.shape) == 4:
+        annotation = annotation.squeeze(axis=(0,1))
+    elif len(annotation.shape) == 3:
+        annotation = annotation.squeeze(axis=0)
+    result = Image.fromarray(annotation.astype(np.uint8), 'P')
+    result.putpalette(palette)
+    result.save(file_name)
 
 
 # inspired from Detectron
@@ -369,7 +420,7 @@ def inference_davis(
         if torch.distributed.deprecated.is_initialized()
         else 1
     )
-    logger = logging.getLogger("davis_maskrcnn.inference")
+    logger = logging.getLogger("DAVIS_MaskRCNN_baseline_test")
     dataset = data_loader.dataset
     logger.info("Start evaluation on {} images".format(len(dataset)))
     start_time = time.time()
@@ -394,12 +445,12 @@ def inference_davis(
 
     logger.info("Preparing results for COCO format")
     davis_results = {}
-    if "bbox" in iou_types:
-        logger.info("Preparing bbox results")
-        davis_results["bbox"] = prepare_for_davis_detection(predictions, dataset)
+    # if "bbox" in iou_types:
+    #     logger.info("Preparing bbox results")
+    #     davis_results["bbox"] = prepare_for_davis_detection(predictions, dataset)
     if "segm" in iou_types:
         logger.info("Preparing segm results")
-        davis_results["segm"] = prepare_for_davis_segmentation(predictions, dataset)
+        davis_results["segm"] = generate_davis_annotation(predictions, dataset, output_folder)
 
     # results = COCOResults(*iou_types)
     # logger.info("Evaluating predictions")

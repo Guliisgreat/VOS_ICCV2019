@@ -1,5 +1,6 @@
 import cv2
 import torch
+import numpy as np
 from torchvision import transforms as T
 
 
@@ -59,7 +60,7 @@ def compute_colors_for_labels(labels):
     return colors
 
 
-def vote_pixelOfMask_for_annotation(masks, predictions):
+def vote_pixelOfMask_for_annotation(masks, prediction):
     '''
     Each prediction(box) possiblely overlaps with others,  but there is only one label
     to represent each instance's pixels in the final annotation.
@@ -78,7 +79,31 @@ def vote_pixelOfMask_for_annotation(masks, predictions):
             in an image on the locations specified by the bounding boxes
 
     Returns:
-        prediction (BoxList): the detected objects. Additional information
-            of the detection properties can be found in the fields of
-            the BoxList via `prediction.fields()`
+        annotation (torch.tenor): the final annotation  included with all instances
     '''
+    num_instance = len(masks)
+
+    scores = prediction.get_field("scores").numpy()
+    masks = masks.numpy()
+    pixel_scores = [score * mask for score, mask in zip(scores, masks) ]
+    annotation = np.array(pixel_scores).argmax(axis=0)
+    if len(annotation.shape) == 3:
+        annotation = np.expand_dims(np.array(annotation, dtype=np.uint8), axis=0)
+    annotation = torch.from_numpy(annotation)
+
+    # assert len(list(np.unique(annotation))) == num_instance, 'Vote pixel mechanism failed'
+    return annotation
+
+
+def extract_img_info(seg_name):
+    '''
+        Arguments:
+            seg_name (string): the filename of annotation
+
+        Returns:
+            video_id (string):
+            image_id (string):
+        '''
+    video_id = seg_name.split('/')[-2]
+    image_id = seg_name.split('/')[-1].split('.')[-2]
+    return video_id, image_id

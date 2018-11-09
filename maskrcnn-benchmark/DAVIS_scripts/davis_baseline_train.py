@@ -17,6 +17,7 @@ from maskrcnn_benchmark.utils.checkpoint import Checkpointer
 from maskrcnn_benchmark.utils.collect_env import collect_env_info
 from maskrcnn_benchmark.utils.logging import setup_logger
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
+from davis_components.train import LoadYuwenCheckpoint
 
 
 def train(cfg, local_rank, distributed):
@@ -35,15 +36,21 @@ def train(cfg, local_rank, distributed):
         )
 
     arguments = {}
-    arguments["iteration"] = 0
 
     output_dir = cfg.OUTPUT_DIR
 
     save_to_disk = local_rank == 0
 
-    checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk)
+    checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
+                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
+    arguments["iteration"] = 0
+    # checkpointer = LoadYuwenCheckpoint(model=model, num_class=2)
+    # checkpointer.load(cfg.MODEL.WEIGHT)
+    #
+    # checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
+    #                             num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
 
     data_loader_train = make_data_loader(
         cfg,
@@ -115,7 +122,7 @@ def main():
     if output_dir:
         mkdir(output_dir)
 
-    logger = setup_logger("DAVIS_MaskRCNN_baseline_training", output_dir, args.local_rank)
+    logger = setup_logger("Training", output_dir, args.local_rank)
     logger.info("Using {} GPUs".format(num_gpus))
     logger.info(args)
 
