@@ -25,8 +25,8 @@ def compute_on_dataset(model, data_loader, device):
     results_dict = {}
     cpu_device = torch.device("cpu")
     for i, batch in tqdm(enumerate(data_loader)):
-        if i > 20:
-            break
+        # if i > 5:
+        #     break
 
         images, targets, image_ids = batch
         images = images.to(device)
@@ -80,7 +80,7 @@ def prepare_for_coco_segmentation(predictions, dataset):
     masker = Masker(threshold=0.5, padding=1)
     # assert isinstance(dataset, COCODataset)
     coco_results = []
-    for image_id, prediction in tqdm(enumerate(predictions)):
+    for image_id, prediction in enumerate(predictions):
         original_id = dataset.id_to_img_map[image_id]
         if len(prediction) == 0:
             continue

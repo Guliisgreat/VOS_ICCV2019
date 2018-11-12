@@ -16,7 +16,7 @@ from ..structures.bounding_box import BoxList
 from ..utils.comm import is_main_process
 from ..utils.comm import scatter_gather
 from ..utils.comm import synchronize
-from utils.visualization import visualize_batch_mask_for_debug
+from utils_davis.visualization import visualize_batch_mask_for_debug
 
 
 from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
@@ -24,14 +24,13 @@ from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
 from davis_components.inference import vote_pixelOfMask_for_annotation, extract_img_info
 
 
-
 def compute_on_dataset(model, data_loader, device):
     model.eval()
     results_dict = {}
     cpu_device = torch.device("cpu")
     for i, batch in tqdm(enumerate(data_loader)):
-        if i > 5:
-            break
+        # if i > 5:
+        #     break
 
         images, targets, image_ids = batch
         images = images.to(device)
@@ -82,10 +81,10 @@ def prepare_for_davis_segmentation(predictions, dataset):
     import pycocotools.mask as mask_util
     import numpy as np
 
-    masker = Masker(padding=1, keep_score=True)
+    masker = Masker(threshold=0.5, padding=1)
     # assert isinstance(dataset, COCODataset)
     coco_results = []
-    for image_id, prediction in tqdm(enumerate(predictions)):
+    for image_id, prediction in enumerate(predictions):
         original_id = dataset.id_to_img_map[image_id]
         if len(prediction) == 0:
             continue
@@ -99,7 +98,7 @@ def prepare_for_davis_segmentation(predictions, dataset):
         masks = masker(masks, prediction)
         # logger.info('Time mask: {}'.format(time.time() - t))
         # prediction = prediction.convert('xywh')
-        a = vote_pixelOfMask_for_annotation(masks, prediction)
+
         # boxes = prediction.bbox.tolist()
         scores = prediction.get_field("scores").tolist()
         labels = prediction.get_field("labels").tolist()
@@ -155,8 +154,6 @@ def generate_davis_annotation(predictions, dataset, output_file):
         # prediction = prediction.convert('xywh')
         a = vote_pixelOfMask_for_annotation(masks, prediction)
         save_final_annotation(a, video_id, img_id, palette, output_file)
-
-
 
 
 def save_final_annotation(annotation, video_id, img_id, palette, dirname):
@@ -220,7 +217,7 @@ def evaluate_box_proposals(
 
         # sort predictions in descending order
         # TODO maybe remove this and make it explicit in the documentation
-        inds = prediction.get_field("objectness").sort(descending=True)[1]
+        inds = prediction.get_field("scores").sort(descending=True)[1]
         prediction = prediction[inds]
 
         ann_ids = dataset.coco.getAnnIds(imgIds=original_id)
@@ -311,6 +308,25 @@ def evaluate_predictions_on_coco(
     return coco_eval
 
 
+def evaluate_predictions_on_davis(
+    coco_gt, coco_results, json_result_file, iou_type="bbox"
+):
+    import json
+
+    with open(json_result_file, "w") as f:
+        json.dump(coco_results, f)
+
+    from DAVIS_envaluation.davis_eval import DAVISEval
+
+    coco_dt = coco_gt.loadRes(str(json_result_file))
+    # coco_dt = coco_gt.loadRes(coco_results)
+    coco_eval = DAVISEval(coco_gt, coco_dt, iou_type)
+    coco_eval.evaluate()
+    coco_eval.accumulate()
+    coco_eval.summarize()
+    return coco_eval
+
+
 def _accumulate_predictions_from_multiple_gpus(predictions_per_gpu):
     all_predictions = scatter_gather(predictions_per_gpu)
     if not is_main_process():
@@ -378,6 +394,51 @@ class COCOResults(object):
         return repr(self.results)
 
 
+class DAVISResults(object):
+    METRICS = {
+        "bbox": ["AP", "AP50", "AP75", "APs", "APm", "APl"],
+        "segm": ["AP", "AP50", "AP75", "APs", "APm", "APl"],
+        "box_proposal": [
+            "AR@100",
+            "ARs@100",
+            "ARm@100",
+            "ARl@100",
+            "AR@1000",
+            "ARs@1000",
+            "ARm@1000",
+            "ARl@1000",
+        ],
+        "keypoint": ["AP", "AP50", "AP75", "APm", "APl"],
+    }
+
+    def __init__(self, *iou_types):
+        allowed_types = ("box_proposal", "bbox", "segm")
+        assert all(iou_type in allowed_types for iou_type in iou_types)
+        results = OrderedDict()
+        for iou_type in iou_types:
+            results[iou_type] = OrderedDict(
+                [(metric, -1) for metric in COCOResults.METRICS[iou_type]]
+            )
+        self.results = results
+
+    def update(self, davis_eval):
+        if davis_eval is None:
+            return
+        from DAVIS_envaluation.davis_eval import DAVISEval
+
+        assert isinstance(davis_eval, DAVISEval)
+        s = davis_eval.stats
+        iou_type = davis_eval.params.iouType
+        res = self.results[iou_type]
+        metrics = COCOResults.METRICS[iou_type]
+        for idx, metric in enumerate(metrics):
+            res[metric] = s[idx]
+
+    def __repr__(self):
+        # TODO make it pretty
+        return repr(self.results)
+
+
 def check_expected_results(results, expected_results, sigma_tol):
     if not expected_results:
         return
@@ -400,13 +461,11 @@ def check_expected_results(results, expected_results, sigma_tol):
             logger.info(msg)
 
 
-
-
-
 def inference_davis(
     model,
     data_loader,
     iou_types=("bbox",),
+    box_only=False,
     device="cuda",
     expected_results=(),
     expected_results_sigma_tol=4,
@@ -442,28 +501,48 @@ def inference_davis(
     if output_folder:
         torch.save(predictions, os.path.join(output_folder, "predictions.pth"))
 
+    if box_only:
+        logger.info("Evaluating bbox proposals")
+        areas = {"all": "", "small": "s", "medium": "m", "large": "l"}
+        res = COCOResults("box_proposal")
+        for limit in [100, 1000]:
+            for area, suffix in areas.items():
+                stats = evaluate_box_proposals(
+                    predictions, dataset, area=area, limit=limit
+                )
+                key = "AR{}@{:d}".format(suffix, limit)
+                res.results["box_proposal"][key] = stats["ar"].item()
+        logger.info(res)
+        check_expected_results(res, expected_results, expected_results_sigma_tol)
+        if output_folder:
+            torch.save(res, os.path.join(output_folder, "box_proposals.pth"))
+        return
 
     logger.info("Preparing results for COCO format")
     davis_results = {}
-    # if "bbox" in iou_types:
-    #     logger.info("Preparing bbox results")
-    #     davis_results["bbox"] = prepare_for_davis_detection(predictions, dataset)
+    if "bbox" in iou_types:
+        logger.info("Preparing bbox results")
+        davis_results["bbox"] = prepare_for_davis_detection(predictions, dataset)
     if "segm" in iou_types:
         logger.info("Preparing segm results")
-        davis_results["segm"] = generate_davis_annotation(predictions, dataset, output_folder)
+        davis_results["segm"] = prepare_for_davis_segmentation(predictions, dataset)
 
-    # results = COCOResults(*iou_types)
-    # logger.info("Evaluating predictions")
-    # for iou_type in iou_types:
-    #     with tempfile.NamedTemporaryFile() as f:
-    #         file_path = f.name
-    #         if output_folder:
-    #             file_path = os.path.join(output_folder, iou_type + ".json")
-    #         res = evaluate_predictions_on_coco(
-    #             dataset.coco, davis_results[iou_type], file_path, iou_type
-    #         )
-    #         results.update(res)
-    # logger.info(results)
-    # check_expected_results(results, expected_results, expected_results_sigma_tol)
-    # if output_folder:
-    #     torch.save(results, os.path.join(output_folder, "coco_results.pth"))
+    # if "segm" in iou_types:
+    #     logger.info("Preparing segm results")
+    #     davis_results["segm"] = generate_davis_annotation(predictions, dataset, output_folder)
+
+    results = DAVISResults(*iou_types)
+    logger.info("Evaluating predictions")
+    for iou_type in iou_types:
+        with tempfile.NamedTemporaryFile() as f:
+            file_path = f.name
+            if output_folder:
+                file_path = os.path.join(output_folder, iou_type + ".json")
+            res = evaluate_predictions_on_davis(
+                dataset.coco, davis_results[iou_type], file_path, iou_type
+            )
+            results.update(res)
+    logger.info(results)
+    check_expected_results(results, expected_results, expected_results_sigma_tol)
+    if output_folder:
+        torch.save(results, os.path.join(output_folder, "coco_results.pth"))
