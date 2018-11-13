@@ -23,14 +23,17 @@ from maskrcnn_benchmark.modeling.roi_heads.mask_head.inference import Masker
 from maskrcnn_benchmark.structures.boxlist_ops import boxlist_iou
 from davis_components.inference import vote_pixelOfMask_for_annotation, extract_img_info
 
+from instanceMatching.matching import InstanceMatcher
 
-def compute_on_dataset(model, data_loader, device):
+
+def compute_on_dataset(model, data_loader, device, debug):
     model.eval()
     results_dict = {}
     cpu_device = torch.device("cpu")
     for i, batch in tqdm(enumerate(data_loader)):
-        # if i > 5:
-        #     break
+        if debug:
+            if i > 5:
+                break
 
         images, targets, image_ids = batch
         images = images.to(device)
@@ -41,6 +44,22 @@ def compute_on_dataset(model, data_loader, device):
             {img_id: result for img_id, result in zip(image_ids, output)}
         )
     return results_dict
+
+
+def matching_instance_with_gt_template(data_loader, predictions, debug):
+    matcher = InstanceMatcher(iou_type='bbox')
+    matched_prediction = []
+    for i, batch in tqdm(enumerate(data_loader)):
+        if debug:
+            if i > 5:
+                break
+
+        images, targets, image_ids = batch
+        templates = targets
+        for prediction, template in zip(predictions, templates):
+            matched_prediction.append(matcher(prediction, template))
+
+    return matched_prediction
 
 
 def prepare_for_davis_detection(predictions, dataset):
@@ -470,6 +489,7 @@ def inference_davis(
     expected_results=(),
     expected_results_sigma_tol=4,
     output_folder=None,
+    debug=True
 ):
 
     # convert to a torch.device for efficiency
@@ -483,7 +503,7 @@ def inference_davis(
     dataset = data_loader.dataset
     logger.info("Start evaluation on {} images".format(len(dataset)))
     start_time = time.time()
-    predictions = compute_on_dataset(model, data_loader, device)
+    predictions = compute_on_dataset(model, data_loader, device, debug)
     # wait for all processes to complete before measuring the time
     synchronize()
     total_time = time.time() - start_time
@@ -500,6 +520,13 @@ def inference_davis(
 
     if output_folder:
         torch.save(predictions, os.path.join(output_folder, "predictions.pth"))
+
+    logger.info(
+        "Start matching prediction with Templates(gt)."
+    )
+    matched_predictions = matching_instance_with_gt_template(data_loader, predictions, debug)
+    if output_folder:
+        torch.save(matched_predictions, os.path.join(output_folder, "matched_predictions.pth"))
 
     if box_only:
         logger.info("Evaluating bbox proposals")
@@ -527,10 +554,6 @@ def inference_davis(
         logger.info("Preparing segm results")
         davis_results["segm"] = prepare_for_davis_segmentation(predictions, dataset)
 
-    # if "segm" in iou_types:
-    #     logger.info("Preparing segm results")
-    #     davis_results["segm"] = generate_davis_annotation(predictions, dataset, output_folder)
-
     results = DAVISResults(*iou_types)
     logger.info("Evaluating predictions")
     for iou_type in iou_types:
@@ -545,4 +568,31 @@ def inference_davis(
     logger.info(results)
     check_expected_results(results, expected_results, expected_results_sigma_tol)
     if output_folder:
-        torch.save(results, os.path.join(output_folder, "coco_results.pth"))
+        torch.save(results, os.path.join(output_folder, "davis_results.pth"))
+
+    # matched_prediction
+    logger.info('-' * 20)
+    logger.info("Preparing Evaluation on matched prediction")
+    davis_results = {}
+    if "bbox" in iou_types:
+        logger.info("Preparing bbox results")
+        davis_results["bbox"] = prepare_for_davis_detection(matched_predictions, dataset)
+    if "segm" in iou_types:
+        logger.info("Preparing segm results")
+        davis_results["segm"] = prepare_for_davis_segmentation(matched_predictions, dataset)
+
+    results = DAVISResults(*iou_types)
+    for iou_type in iou_types:
+        with tempfile.NamedTemporaryFile() as f:
+            file_path = f.name
+            if output_folder:
+                file_path = os.path.join(output_folder, iou_type + "_matched_" + ".json")
+            res = evaluate_predictions_on_davis(
+                dataset.coco, davis_results[iou_type], file_path, iou_type
+            )
+            results.update(res)
+    logger.info(results)
+    check_expected_results(results, expected_results, expected_results_sigma_tol)
+    if output_folder:
+        torch.save(results, os.path.join(output_folder, "davis_matched_results.pth"))
+
