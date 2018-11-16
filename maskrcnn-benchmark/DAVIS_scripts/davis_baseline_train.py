@@ -7,6 +7,7 @@ import argparse
 import os
 
 import torch
+import logging
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
 from maskrcnn_benchmark.solver import make_lr_scheduler
@@ -18,6 +19,7 @@ from maskrcnn_benchmark.utils.collect_env import collect_env_info
 from maskrcnn_benchmark.utils.logging import setup_logger
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
 from davis_components.train import LoadYuwenCheckpoint
+from utils_davis import tools
 
 
 def train(cfg, local_rank, distributed):
@@ -34,34 +36,36 @@ def train(cfg, local_rank, distributed):
             # this should be removed if we update BatchNorm stats
             broadcast_buffers=False,
         )
+    logger = logging.getLogger("Training")
+    with tools.TimerBlock("Loading Experimental setups", logger) as block:
+        exp_name = cfg.EXP.NAME
+        output_dir = tools.get_exp_output_dir(exp_name, cfg.OUTPUT_DIR)
+        checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
+        validation_period = cfg.SOLVER.VALIDATION_PERIOD
 
-    arguments = {}
+    with tools.TimerBlock("Initializing DAVIS Datasets", logger) as block:
+        logger.info("Loading Checkpoints...")
+        arguments = {}
+        save_to_disk = local_rank == 0
+        checkpointer = Checkpointer(model,
+                                    save_dir=output_dir, save_to_disk=save_to_disk, \
+                                    num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
+        extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
+        arguments.update(extra_checkpoint_data)
+        arguments["iteration"] = 0
 
-    output_dir = cfg.OUTPUT_DIR
+    with tools.TimerBlock("Initializing DAVIS Datasets", logger) as block:
+        logger.info("Loading training set...")
+        data_loader_train = make_data_loader(
+            cfg,
+            is_train=True,
+            is_distributed=distributed,
+            start_iter=arguments["iteration"],
+        )
+        logger.info("Loading valid set...")
+        data_loaders_valid = make_data_loader(cfg, is_train=False, is_distributed=distributed)
 
-    save_to_disk = local_rank == 0
 
-    checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
-                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
-    extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
-    arguments.update(extra_checkpoint_data)
-    arguments["iteration"] = 0
-    # checkpointer = LoadYuwenCheckpoint(model=model, num_class=2)
-    # checkpointer.load(cfg.MODEL.WEIGHT)
-    #
-    # checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
-    #                             num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
-
-    data_loader_train = make_data_loader(
-        cfg,
-        is_train=True,
-        is_distributed=distributed,
-        start_iter=arguments["iteration"],
-    )
-    data_loaders_valid = make_data_loader(cfg, is_train=False, is_distributed=distributed)
-
-    checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
-    validation_period = cfg.SOLVER.VALIDATION_PERIOD
 
     do_train(
         model,
@@ -74,10 +78,10 @@ def train(cfg, local_rank, distributed):
         checkpoint_period,
         validation_period,
         arguments,
+        exp_name,
     )
 
     return model
-
 
 
 def main():
@@ -118,9 +122,9 @@ def main():
     cfg.merge_from_list(args.opts)
     cfg.freeze()
 
-    output_dir = cfg.OUTPUT_DIR
-    if output_dir:
-        mkdir(output_dir)
+
+    exp_name = cfg.EXP.NAME
+    output_dir = tools.get_exp_output_dir(exp_name, cfg.OUTPUT_DIR)
 
     logger = setup_logger("Training", output_dir, args.local_rank)
     logger.info("Using {} GPUs".format(num_gpus))
@@ -138,7 +142,6 @@ def main():
     model = train(cfg, args.local_rank, args.distributed)
 
     logger.info("Training is Finished")
-
 
 
 if __name__ == "__main__":

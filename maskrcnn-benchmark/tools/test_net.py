@@ -11,7 +11,7 @@ from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
 from maskrcnn_benchmark.engine.inference import inference
 from maskrcnn_benchmark.modeling.detector import build_detection_model
-from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer
+from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer, Checkpointer
 from maskrcnn_benchmark.utils.collect_env import collect_env_info
 from maskrcnn_benchmark.utils.comm import synchronize
 from maskrcnn_benchmark.utils.logging import setup_logger
@@ -22,7 +22,7 @@ def main():
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Inference")
     parser.add_argument(
         "--config-file",
-        default="/private/home/fmassa/github/detectron.pytorch_v2/configs/e2e_faster_rcnn_R_50_C4_1x_caffe2.yaml",
+        default="/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/configs/e2e_mask_rcnn_R_50_FPN_1x_binaryCOCO.yaml",
         metavar="FILE",
         help="path to config file",
     )
@@ -50,7 +50,7 @@ def main():
     cfg.freeze()
 
     save_dir = ""
-    logger = setup_logger("maskrcnn_benchmark", save_dir, args.local_rank)
+    logger = setup_logger("maskrcnn_benchmark.inference", save_dir, args.local_rank)
     logger.info("Using {} GPUs".format(num_gpus))
     logger.info(cfg)
 
@@ -60,8 +60,14 @@ def main():
     model = build_detection_model(cfg)
     model.to(cfg.MODEL.DEVICE)
 
-    checkpointer = DetectronCheckpointer(cfg, model)
-    _ = checkpointer.load(cfg.MODEL.WEIGHT)
+    # checkpointer = DetectronCheckpointer(cfg, model)
+    # _ = checkpointer.load(cfg.MODEL.WEIGHT)
+
+    WEIGHT = "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark" \
+             "/pretrained_weight/coco2017_maskrcnn_detectron_0359999.pth"
+    checkpointer = Checkpointer(model,
+                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
+    _ = checkpointer.load(WEIGHT)
 
     iou_types = ("bbox",)
     if cfg.MODEL.MASK_ON:

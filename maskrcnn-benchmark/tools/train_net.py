@@ -42,16 +42,17 @@ def train(cfg, local_rank, distributed):
         )
 
     arguments = {}
+    arguments["iteration"] = 0
 
 
     output_dir = cfg.OUTPUT_DIR
 
     save_to_disk = local_rank == 0
-    # checkpointer = DetectronCheckpointer(
-    #     cfg, model, optimizer, scheduler, output_dir, save_to_disk
-    # )
-    checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
-                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
+    checkpointer = DetectronCheckpointer(
+        cfg, model, optimizer, scheduler, output_dir, save_to_disk
+    )
+    # checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
+    #                             num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
 

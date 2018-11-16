@@ -34,11 +34,19 @@ class DatasetCatalog(object):
 
 
         "coco_2017_train": (
-            "coco/train2014",
+            "coco/train2017",
             "coco/annotations/instances_train2017.json",
         ),
         "coco_2017_val": ("coco/val2017",
                           "coco/annotations/instances_val2017.json"),
+
+        "coco_2017_train_binary": (
+            "coco/train2017",
+            "coco/annotations/instances_train2017_binary.json",
+        ),
+        "coco_2017_val_binary": (
+            "coco/val2017",
+            "coco/annotations/instances_val2017_binary.json"),
 
 
         "DAVIS_train": (

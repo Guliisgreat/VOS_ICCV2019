@@ -15,6 +15,7 @@ from maskrcnn_benchmark.utils.tensorboard_logger import TensorboardXLogger
 from maskrcnn_benchmark.config import cfg
 import os
 
+
 def reduce_loss_dict(loss_dict):
     """
     Reduce the loss dictionary from all processes so that process with rank
@@ -51,11 +52,12 @@ def do_train(
     checkpoint_period,
     validation_period,
     arguments,
+    exp_name,
 ):
     logger = logging.getLogger("Training")
     logger.info("Start training")
     meters = MetricLogger(delimiter="  ")
-    tensorboard_path = os.path.join('../output/tensorboard', cfg.EXP.NAME)
+    tensorboard_path = os.path.join('../output/tensorboard', exp_name)
     tensorboard_logger = TensorboardXLogger(log_dir=tensorboard_path)
 
     max_iter = len(data_loader_train)
@@ -96,7 +98,6 @@ def do_train(
 
         tensorboard_logger.write(meters, iteration, phase='Train')
 
-
         if iteration % (validation_period / 10) == 0 or iteration == (max_iter - 1):
             logger.info(
                 meters.delimiter.join(
@@ -116,7 +117,6 @@ def do_train(
 
         if iteration % validation_period == 0 and iteration > 0:
             validation(model, data_loaders_valid, device, logger, tensorboard_logger, iteration)
-
 
         if iteration % checkpoint_period == 0 and iteration > 0:
             checkpointer.save("model_{:07d}".format(iteration), **arguments)

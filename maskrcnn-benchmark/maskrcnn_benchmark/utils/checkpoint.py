@@ -115,7 +115,7 @@ class Checkpointer(object):
 
     def _load_model(self, checkpoint):
         if "model" in checkpoint:
-            load_state_dict(self.model, checkpoint.pop("model"))
+            load_state_dict(self.model, checkpoint["model"])
         else:
             load_state_dict(self.model, checkpoint)
 
