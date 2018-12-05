@@ -1,6 +1,46 @@
 import numpy as np
 
 
+def davis_toolbox_evaluation(output_dir):
+    """
+    Use default DAVIS toolbox to evaluate the performance (J, F)
+    Print the result on the table
+    Save the result into a yaml file
+
+    Args:
+        output_dir: the folder includes all final annotations
+    """
+    import os.path as osp
+    import itertools
+    import yaml
+
+    from utils_davis.davis_toolbox import Timer, log, cfg, db_eval, phase, DAVISLoader, Segmentation
+    from prettytable import PrettyTable
+
+    phase = phase.VAL
+    # phase = phase[config.dataset.test_image_set.replace('_480p', '')]
+
+    # Load DAVIS
+    db = DAVISLoader('2017', phase, False)
+    print('Loading video segmentations from: {}'.format(output_dir))
+    # Load segmentation
+    segmentations = [Segmentation(
+        osp.join(output_dir, s), False) for s in db.iternames()]
+    # Evaluate results
+    evaluation = db_eval(db, segmentations, ['J', 'F'])
+    # Print results
+    table = PrettyTable(['Method'] + [p[0] + '_' + p[1] for p in
+                                      itertools.product(['J', 'F'], ['mean', 'recall', 'decay'])])
+    table.add_row([osp.basename(output_dir)] + ["%.3f" % np.round(
+        evaluation['dataset'][metric][statistic], 3) for metric, statistic
+                                                in itertools.product(['J', 'F'], ['mean', 'recall', 'decay'])])
+    print(str(table) + "\n")
+    # Save results into yaml file
+    with open(osp.join(output_dir, 'davis_eval_results.yaml'), 'w') as f:
+        yaml.dump(evaluation, f)
+
+
+
 
 def calc_iou_individual(pred_box, gt_box):
     """Calculate IoU of single predicted and ground truth box

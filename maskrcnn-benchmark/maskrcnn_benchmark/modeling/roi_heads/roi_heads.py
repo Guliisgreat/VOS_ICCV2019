@@ -3,6 +3,7 @@ import torch
 
 from .box_head.box_head import build_roi_box_head
 from .mask_head.mask_head import build_roi_mask_head
+from maskrcnn_benchmark.modeling.utils_davis import pad_boxes_on_detections
 
 
 class CombinedROIHeads(torch.nn.ModuleDict):
@@ -33,6 +34,17 @@ class CombinedROIHeads(torch.nn.ModuleDict):
                 mask_features = x
             # During training, self.box() will return the unaltered proposals as "detections"
             # this makes the API consistent during training and testing
+
+            if self.training and self.cfg.TRAIN.USE_GT_BOX:
+                for target, detection in zip(targets, detections):
+                    detection.bbox = target.bbox
+                    detection.remove_field("regression_targets")
+                    detection.extra_fields['objectness'] = torch.ones(len(target.bbox)) * 0.95
+                    detection.extra_fields['labels'] = torch.ones(len(target.bbox), dtype=torch.int32)
+
+            if not self.training and self.cfg.TEST.PAD_BOX:
+                detections = pad_boxes_on_detections(detections, self.cfg.TEST.PAD_SIZE)
+
             x, detections, loss_mask = self.mask(mask_features, detections, targets)
             losses.update(loss_mask)
         return x, detections, losses

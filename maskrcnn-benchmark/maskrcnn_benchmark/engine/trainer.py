@@ -13,6 +13,9 @@ from maskrcnn_benchmark.utils.metric_logger import MetricLogger
 from maskrcnn_benchmark.utils.tensorboard_logger import TensorboardXLogger
 
 from maskrcnn_benchmark.config import cfg
+
+
+
 import os
 
 
@@ -65,6 +68,7 @@ def do_train(
     model.train()
     start_training_time = time.time()
     end = time.time()
+    # validation(model, data_loaders_valid, device, logger, tensorboard_logger, start_iter)
     for iteration, (images, targets, _) in enumerate(data_loader_train, start_iter):
         data_time = time.time() - end
         arguments["iteration"] = iteration
@@ -74,7 +78,7 @@ def do_train(
         images = images.to(device)
         targets = [target.to(device) for target in targets]
 
-        loss_dict = model(images, targets)
+        loss_dict, _ = model(images, targets)
 
         losses = sum(loss for loss in loss_dict.values())
 
@@ -147,19 +151,17 @@ def validation(
 
     max_iter = len(data_loader)
 
-
     for idx, batch in enumerate(tqdm(data_loader)):
         images, targets, _ = batch
         images = images.to(device)
         targets = [target.to(device) for target in targets]
 
         with torch.no_grad():
-            loss_dict = model(images, targets)
+            loss_dict, _ = model(images, targets)
             # reduce losses over all GPUs for logging purposes
             loss_dict_reduced = reduce_loss_dict(loss_dict)
             losses_reduced = sum(loss for loss in loss_dict_reduced.values())
             meters.update(total_loss=losses_reduced, **loss_dict_reduced)
-
 
     tensorboard_logger.write(meters, iteration, phase='Valid')
     logger.info('Validation:')
@@ -185,3 +187,10 @@ def validation(
         )
     )
     logger.info('-' * 40)
+
+
+# def compute_iou(predictions, targets, idx):
+#     cpu_device = torch.device("cpu")
+#     targets = [o.to(cpu_device) for o in targets]
+#     predictions = [o.to(cpu_device) for o in predictions]
+

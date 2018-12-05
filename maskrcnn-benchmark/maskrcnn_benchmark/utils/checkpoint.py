@@ -20,7 +20,8 @@ class Checkpointer(object):
         save_to_disk=None,
         logger=None,
         num_class=81,
-        custom = False
+        finetune_class_layer=False,
+
     ):
         self.model = model
         self.optimizer = optimizer
@@ -31,7 +32,7 @@ class Checkpointer(object):
         if logger is None:
             logger = logging.getLogger(__name__)
         self.logger = logger
-        self.custom = custom
+        self.finetune_class_layer = finetune_class_layer
 
     def save(self, name, **kwargs):
         if not self.save_dir:
@@ -63,21 +64,12 @@ class Checkpointer(object):
         #     return {}
         self.logger.info("Loading checkpoint from {}".format(f))
         checkpoint = self._load_file(f)
-        self._load_model(checkpoint)
+        # self._load_model(checkpoint)
 
-        # for j in self.model.state_dict().keys():
-        #     print(j)
-        #     print('-' * 20)
-        #
-        #
-        #
-        # if self.custom:
-        #     self._load_model_backbone_and_rpn(checkpoint)
-        # else:
-        #     if self.check_shape_of_checkpoints(checkpoint):
-        #         self._load_model(checkpoint)
-        #     else:
-        #         self._load_model_except_class_layer(checkpoint)
+        if self.finetune_class_layer:
+            self._load_model_except_class_layer(checkpoint)
+        else:
+            self._load_model(checkpoint)
 
 
         if "optimizer" in checkpoint and self.optimizer:
@@ -115,13 +107,11 @@ class Checkpointer(object):
 
     def _load_model(self, checkpoint):
         if "model" in checkpoint:
-            load_state_dict(self.model, checkpoint["model"])
+            load_state_dict(self.model, checkpoint.pop("model"))
         else:
             load_state_dict(self.model, checkpoint)
 
     def _load_model_except_class_layer(self, checkpoint):
-        if checkpoint['iteration'] >= 10000:
-            checkpoint['iteration'] = 0
         if "model" in checkpoint:
             saved_state_dict = checkpoint['model']
         else:
@@ -139,7 +129,6 @@ class Checkpointer(object):
                 continue
             new_params['.'.join(i_parts)] = saved_state_dict[i]
             print('.'.join(i_parts))
-
         load_state_dict(self.model, new_params)
 
     def _load_model_part(self, saved_state_dict, name='backbone'):

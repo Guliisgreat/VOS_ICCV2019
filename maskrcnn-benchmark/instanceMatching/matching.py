@@ -45,17 +45,34 @@ class InstanceMatcher(object):
         self.iou_type = iou_type
 
     def __call__(self, prediction, template):
-        if prediction is None:
-            raise Exception('Lack of prediction for matching')
-        elif template is None:
-            raise Exception('Lack of template for matching')
 
+        self.check_inputs(prediction, template)
         self.prepare(prediction, template)
         result = self.matching()
-        matched_prediction = self.select_matched_prediction(prediction, result)
-        assert len(matched_prediction.bbox) == len(template.bbox), \
-            "the number of prediction after matched != the number of template"
+        # matched_prediction = self.select_matched_prediction(prediction, result)
+
+        matched_prediction = self.assign_instance_id(prediction, template, result)
+
+        if len(matched_prediction.bbox) != len(template.bbox):
+            a = 1
+
+        # assert len(matched_prediction.bbox) == len(template.bbox), \
+        #     "the number of prediction after matched != the number of template"
         return matched_prediction
+
+    @staticmethod
+    def check_inputs(predictions, templates):
+        """
+            The number of instances in predictions must be more than that in templates
+
+        """
+        if predictions is None:
+            raise Exception('Lack of prediction for matching')
+        elif templates is None:
+            raise Exception('Lack of template for matching')
+
+        # assert len(predictions) >= len(templates), \
+        #     "The number of instances in predictions is less than that in templates"
 
     def prepare(self, prediction, template):
         if self.iou_type == 'bbox':
@@ -71,7 +88,8 @@ class InstanceMatcher(object):
         self.template_objects = template.bbox.tolist()
 
     def matching(self):
-        node_list, edge_list = self._generate_graph()
+        self._generate_graph()
+        node_list, edge_list = self.named_node_list, self.named_edge_list
         matching_result = self._bipartite_maximum_weight(node_list, edge_list)
         result = self._accumulate_results(matching_result)
         return result
@@ -79,11 +97,10 @@ class InstanceMatcher(object):
     def _generate_graph(self):
         node_list = self._generate_node()
         edge_list = self._generate_edge(node_list)
-        named_node_list, named_edge_list = \
+        self.named_node_list, self.named_edge_list = \
             self._prepare_name_for_matching(node_list, edge_list)
-        assert len(named_node_list[0]) * len(named_node_list[1]) == len(named_edge_list), \
+        assert len(self.named_node_list[0]) * len(self.named_node_list[1]) == len(self.named_edge_list), \
             'the number of edges does not match with their corresponding nodes'
-        return named_node_list, named_edge_list
 
     def _generate_node(self):
         predict_objects_list = list(range(len(self.predict_objects)+1))
@@ -107,14 +124,14 @@ class InstanceMatcher(object):
         edge_list = []
         for i in predict_objects_list:
             for j in template_objects_list:
-                iou = self.__compute_iou(self.predict_objects[i - 1], self.template_objects[j - 1])
+                iou = self.__compute_iou(
+                    self.predict_objects[i - 1], self.template_objects[j - 1])
                 if iou == 0:
                     iou = 0.0000001
                 edge_list.append((i, j, {'weight': iou}))
         return edge_list
 
-    @staticmethod
-    def _accumulate_results(matching_result):
+    def _accumulate_results(self, matching_result):
         """
             Argument:
                 matching_result (list(tuple)):
@@ -134,11 +151,24 @@ class InstanceMatcher(object):
                 matched_objects_list['predict'].append(object1 - 1)
                 object2 = int(OBJECT_NAME[object2])
                 matched_objects_list['template'].append(object2 - 1)
+                matched_objects_list['weight'].append(self.extract_iou_from_edge(object1, object2))
             else:
                 object1 = int(OBJECT_NAME[object1])
                 matched_objects_list['template'].append(object1 - 1)
                 matched_objects_list['predict'].append(object2 - 1)
+                matched_objects_list['weight'].append(self.extract_iou_from_edge(object2, object1))
         return matched_objects_list
+
+    @staticmethod
+    def assign_instance_id(prediction, template, matched_objects_list):
+        # for id_predict, id_template in \
+        #         zip(matched_objects_list['predict'], matched_objects_list['template']):
+        #     instance_id = template.get_field("instance_id")[id_template]
+        #     prediction[id_predict].add_field("instance_id", instance_id)
+        instance_id = template.get_field("instance_id")[matched_objects_list['template']]
+        selected_prediction = prediction[matched_objects_list['predict']]
+        selected_prediction.add_field("instance_id", instance_id)
+        return selected_prediction
 
     @staticmethod
     def select_matched_prediction(prediction, matched_objects_list):
@@ -179,10 +209,9 @@ class InstanceMatcher(object):
         # return maskUtils.iou(d,g,iscrowd)
         return calc_iou_individual(a, b)
 
-    @staticmethod
-    def extract_iou_from_edge(edge_list, object1, object2):
+    def extract_iou_from_edge(self, object1, object2):
         object2_name = NODE_NAME[str(object2)]
-        for edge in edge_list:
+        for edge in self.named_edge_list:
             if edge[0:2] == (object1, object2_name):
                 iou = edge[2]['weight']
                 return iou

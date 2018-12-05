@@ -48,11 +48,14 @@ def train(cfg, local_rank, distributed):
     output_dir = cfg.OUTPUT_DIR
 
     save_to_disk = local_rank == 0
-    checkpointer = DetectronCheckpointer(
-        cfg, model, optimizer, scheduler, output_dir, save_to_disk
-    )
-    # checkpointer = Checkpointer(model,save_dir=output_dir, save_to_disk=save_to_disk, \
-    #                             num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
+    # checkpointer = DetectronCheckpointer(
+    #     cfg, model, optimizer, scheduler, output_dir, save_to_disk
+    # )
+    checkpointer = Checkpointer(model,
+                                save_dir=output_dir,
+                                save_to_disk=save_to_disk,
+                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES,
+                                finetune_class_layer=False,)
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
 
@@ -66,7 +69,9 @@ def train(cfg, local_rank, distributed):
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
     validation_period = cfg.SOLVER.VALIDATION_PERIOD
+    exp_name = cfg.EXP.NAME
     if cfg.TEST.SKIP_TRAIN:
+        print("Skip Training...")
         return model
     else:
         do_train(
@@ -80,6 +85,7 @@ def train(cfg, local_rank, distributed):
             checkpoint_period,
             validation_period,
             arguments,
+            exp_name,
         )
 
         return model

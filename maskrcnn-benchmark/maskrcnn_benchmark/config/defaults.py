@@ -195,6 +195,7 @@ _C.MODEL.ROI_MASK_HEAD.MLP_HEAD_DIM = 1024
 _C.MODEL.ROI_MASK_HEAD.CONV_LAYERS = (256, 256, 256, 256)
 _C.MODEL.ROI_MASK_HEAD.RESOLUTION = 14
 _C.MODEL.ROI_MASK_HEAD.SHARE_BOX_FEATURE_EXTRACTOR = True
+_C.MODEL.ROI_MASK_HEAD.LOSS = "Unbalanced"
 
 # ---------------------------------------------------------------------------- #
 # ResNe[X]t options (ResNets = {ResNet, ResNeXt}
@@ -265,6 +266,20 @@ _C.TEST.EXPECTED_RESULTS_SIGMA_TOL = 4
 # see 2 images per batch
 _C.TEST.IMS_PER_BATCH = 8
 _C.TEST.SKIP_TRAIN = False
+_C.TEST.DEBUG = False
+_C.TEST.MATCHING = False
+_C.TEST.OVERLAY_BOX = False
+_C.TEST.GENERATE_ANNOTATION = False
+_C.TEST.SKIP_NETWORK = False
+_C.TEST.SELECT_TOP_PREDICTIONS = False
+_C.TEST.PAD_BOX = False
+_C.TEST.PAD_SIZE = 0
+
+# ---------------------------------------------------------------------------- #
+# Specific Train options
+# ---------------------------------------------------------------------------- #
+_C.TRAIN = CN()
+_C.TRAIN.USE_GT_BOX = False
 
 
 # ---------------------------------------------------------------------------- #

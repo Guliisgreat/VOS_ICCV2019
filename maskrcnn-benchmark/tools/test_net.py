@@ -63,10 +63,10 @@ def main():
     # checkpointer = DetectronCheckpointer(cfg, model)
     # _ = checkpointer.load(cfg.MODEL.WEIGHT)
 
-    WEIGHT = "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark" \
-             "/pretrained_weight/coco2017_maskrcnn_detectron_0359999.pth"
-    checkpointer = Checkpointer(model,
-                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
+    # WEIGHT = "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark" \
+    #          "/pretrained_weight/coco2017_maskrcnn_detectron_0359999.pth"
+    WEIGHT = cfg.MODEL.WEIGHT
+    checkpointer = Checkpointer(model)
     _ = checkpointer.load(WEIGHT)
 
     iou_types = ("bbox",)

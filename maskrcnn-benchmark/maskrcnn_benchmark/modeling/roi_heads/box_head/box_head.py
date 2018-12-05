@@ -54,6 +54,8 @@ class ROIBoxHead(torch.nn.Module):
         loss_classifier, loss_box_reg = self.loss_evaluator(
             [class_logits], [box_regression]
         )
+
+
         return (
             x,
             proposals,

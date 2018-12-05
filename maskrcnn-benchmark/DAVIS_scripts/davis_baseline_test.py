@@ -20,7 +20,6 @@ from maskrcnn_benchmark.utils.miscellaneous import mkdir
 
 def main():
 
-    WEIGHT = "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/pretrained_weight/davis_model_0081000.pth"
 
     parser = argparse.ArgumentParser(description="PyTorch Object Detection Inference")
     parser.add_argument(
@@ -64,16 +63,17 @@ def main():
     model.to(cfg.MODEL.DEVICE)
 
     checkpointer = Checkpointer(model)
-    _ = checkpointer.load(WEIGHT)
+    _ = checkpointer.load(cfg.MODEL.WEIGHT)
 
     iou_types = ("bbox",)
-    if cfg.MODEL.MASK_ON:
-        iou_types = iou_types + ("segm",)
+    # if cfg.MODEL.MASK_ON:
+    #     iou_types = iou_types + ("segm",)
     output_folders = [None] * len(cfg.DATASETS.TEST)
     if cfg.OUTPUT_DIR:
         dataset_names = cfg.DATASETS.TEST
+        exp_name = cfg.EXP.NAME
         for idx, dataset_name in enumerate(dataset_names):
-            output_folder = os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name)
+            output_folder = os.path.join(cfg.OUTPUT_DIR, "inference", dataset_name + "_" + exp_name)
             mkdir(output_folder)
             output_folders[idx] = output_folder
     data_loaders_val = make_data_loader(cfg, is_train=False, is_distributed=distributed)
@@ -87,7 +87,12 @@ def main():
             expected_results=cfg.TEST.EXPECTED_RESULTS,
             expected_results_sigma_tol=cfg.TEST.EXPECTED_RESULTS_SIGMA_TOL,
             output_folder=output_folder,
-            debug=False
+            debug=cfg.TEST.DEBUG,
+            generate_annotation=cfg.TEST.GENERATE_ANNOTATION,
+            overlay_box=cfg.TEST.OVERLAY_BOX,
+            matching=cfg.TEST.MATCHING,
+            skip_computation_network=cfg.TEST.SKIP_NETWORK,
+            select_top_predictions_flag=cfg.TEST.SELECT_TOP_PREDICTIONS,
         )
         synchronize()
 

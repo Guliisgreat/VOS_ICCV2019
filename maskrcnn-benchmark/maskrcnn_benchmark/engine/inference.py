@@ -25,7 +25,7 @@ def compute_on_dataset(model, data_loader, device):
     results_dict = {}
     cpu_device = torch.device("cpu")
     for i, batch in tqdm(enumerate(data_loader)):
-        # if i > 5:
+        # if i > 2:
         #     break
 
         images, targets, image_ids = batch

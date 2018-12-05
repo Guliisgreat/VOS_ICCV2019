@@ -1,6 +1,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 import torch
 from torch.nn import functional as F
+import numpy as np
 
 from maskrcnn_benchmark.layers import smooth_l1_loss
 from maskrcnn_benchmark.modeling.matcher import Matcher
@@ -130,15 +131,77 @@ class MaskRCNNLossComputation(object):
         return mask_loss
 
 
+class MaskRCNNBalancedLossComputation(MaskRCNNLossComputation):
+    def __init__(self, proposal_matcher, discretization_size):
+        super(MaskRCNNBalancedLossComputation, self).__init__(proposal_matcher, discretization_size)
+
+    def __call__(self, proposals, mask_logits, targets):
+        """
+        Arguments:
+            proposals (list[BoxList])
+            mask_logits (Tensor)
+            targets (list[BoxList])
+
+        Return:
+            mask_loss (Tensor): scalar tensor containing the loss
+        """
+        labels, mask_targets = self.prepare_targets(proposals, targets)
+
+        labels = cat(labels, dim=0)
+        mask_targets = cat(mask_targets, dim=0)
+
+        positive_inds = torch.nonzero(labels > 0).squeeze(1)
+        labels_pos = labels[positive_inds]
+
+        # torch.mean (in binary_cross_entropy_with_logits) doesn't
+        # accept empty tensors, so handle it separately
+        if mask_targets.numel() == 0:
+            return mask_logits.sum() * 0
+
+        mask_loss = self.balanced_cross_entropy_with_logits(
+            mask_logits[positive_inds, labels_pos], mask_targets
+        )
+        return mask_loss
+
+    def balanced_cross_entropy_with_logits(self, mask_logits, mask_targets):
+        weights = self.compute_pos_weights(mask_targets)
+        # mask_loss = F.cross_entropy(input=mask_logits, target=mask_targets, weight=weights)
+
+        mask_loss = F.binary_cross_entropy_with_logits(input=mask_logits, target=mask_targets,  pos_weight=weights)
+        return mask_loss
+
+    @staticmethod
+    def compute_pos_weights(mask_targets):
+        mask_targets = mask_targets.cpu().detach().numpy()
+        pos_weights = np.zeros(mask_targets.shape)
+        for idx, mask_target in enumerate(mask_targets):
+
+            if (mask_target == 1).sum() == 0:
+                weight = 1
+            else:
+                weight = ((mask_target == 0).sum() / (mask_target == 1).sum())
+            pos_weights[idx] = weight * mask_target
+
+        return torch.tensor(pos_weights, dtype=torch.float32, device=torch.device("cuda"))
+
+
+
 def make_roi_mask_loss_evaluator(cfg):
     matcher = Matcher(
         cfg.MODEL.ROI_HEADS.FG_IOU_THRESHOLD,
         cfg.MODEL.ROI_HEADS.BG_IOU_THRESHOLD,
         allow_low_quality_matches=False,
     )
-
-    loss_evaluator = MaskRCNNLossComputation(
-        matcher, cfg.MODEL.ROI_MASK_HEAD.RESOLUTION
-    )
+    loss_type = cfg.MODEL.ROI_MASK_HEAD.LOSS
+    if loss_type == "Unbalanced":
+        loss_evaluator = MaskRCNNLossComputation(
+            matcher, cfg.MODEL.ROI_MASK_HEAD.RESOLUTION
+        )
+    elif loss_type == "Balanced":
+        loss_evaluator = MaskRCNNBalancedLossComputation(
+            matcher, cfg.MODEL.ROI_MASK_HEAD.RESOLUTION
+        )
 
     return loss_evaluator
+
+

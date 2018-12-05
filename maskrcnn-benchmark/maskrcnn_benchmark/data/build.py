@@ -39,6 +39,9 @@ def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True):
         if data["factory"] == "DAVISDataset":
             # args["remove_images_without_annotations"] = is_train
             args["remove_images_without_annotations"] = True
+        if data["factory"] == "DAVISDatasetAddInstanceID":
+            # args["remove_images_without_annotations"] = is_train
+            args["remove_images_without_annotations"] = True
         args["transforms"] = transforms
         # make dataset from factory
         dataset = factory(**args)

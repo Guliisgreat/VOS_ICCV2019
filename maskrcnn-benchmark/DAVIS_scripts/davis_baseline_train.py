@@ -32,7 +32,9 @@ def train(cfg, local_rank, distributed):
 
     if distributed:
         model = torch.nn.parallel.deprecated.DistributedDataParallel(
-            model, device_ids=[local_rank], output_device=local_rank,
+            model,
+            device_ids=[local_rank],
+            output_device=local_rank,
             # this should be removed if we update BatchNorm stats
             broadcast_buffers=False,
         )
@@ -43,13 +45,14 @@ def train(cfg, local_rank, distributed):
         checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
         validation_period = cfg.SOLVER.VALIDATION_PERIOD
 
-    with tools.TimerBlock("Initializing DAVIS Datasets", logger) as block:
-        logger.info("Loading Checkpoints...")
+    with tools.TimerBlock("Loading Checkpoints...", logger) as block:
         arguments = {}
         save_to_disk = local_rank == 0
         checkpointer = Checkpointer(model,
-                                    save_dir=output_dir, save_to_disk=save_to_disk, \
-                                    num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES)
+                                    save_dir=output_dir,
+                                    save_to_disk=save_to_disk,
+                                    num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES,
+                                    finetune_class_layer=False)
         extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
         arguments.update(extra_checkpoint_data)
         arguments["iteration"] = 0
@@ -63,9 +66,11 @@ def train(cfg, local_rank, distributed):
             start_iter=arguments["iteration"],
         )
         logger.info("Loading valid set...")
-        data_loaders_valid = make_data_loader(cfg, is_train=False, is_distributed=distributed)
-
-
+        data_loaders_valid = make_data_loader(
+            cfg,
+            is_train=False,
+            is_distributed=distributed,
+        )
 
     do_train(
         model,

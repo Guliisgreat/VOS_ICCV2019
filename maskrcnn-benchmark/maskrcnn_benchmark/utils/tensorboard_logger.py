@@ -7,7 +7,7 @@ class TensorboardXLogger(object):
 
     def write(self, meters, iteration, phase='Train'):
         for name, meter in meters.meters.items():
-            if name.split('_')[0] != 'loss' and name.split('_')[0] != 'lr':
+            if name.split('_')[0] != 'loss' and name.split('_')[0] != 'lr' and name != "total_loss":
                 continue
             name = name + '_' + phase
             # if phase == 'Train':

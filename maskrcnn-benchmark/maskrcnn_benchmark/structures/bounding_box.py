@@ -39,6 +39,9 @@ class BoxList(object):
     def add_field(self, field, field_data):
         self.extra_fields[field] = field_data
 
+    def remove_field(self, field):
+        del self.extra_fields[field]
+
     def get_field(self, field):
         return self.extra_fields[field]
 
@@ -47,6 +50,12 @@ class BoxList(object):
 
     def fields(self):
         return list(self.extra_fields.keys())
+
+    def get_img_width(self):
+        return self.size[0]
+
+    def get_img_height(self):
+        return self.size[1]
 
     def _copy_extra_fields(self, bbox):
         for k, v in bbox.extra_fields.items():
@@ -248,6 +257,8 @@ class BoxList(object):
 
 if __name__ == "__main__":
     bbox = BoxList([[0, 0, 10, 10], [0, 0, 5, 5]], (10, 10))
+    bbox.add_field('mask', 1)
+    bbox.remove_field('mask')
     s_bbox = bbox.resize((5, 5))
     print(s_bbox)
     print(s_bbox.bbox)

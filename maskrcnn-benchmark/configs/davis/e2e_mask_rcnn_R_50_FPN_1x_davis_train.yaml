@@ -1,7 +1,6 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-#  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
-  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/pretrained_weight/e2e_mask_rcnn_R_50_FPN_1x.pth"
+  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/pretrained_weight/coco2014_binary_680k.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
     OUT_CHANNELS: 256
@@ -14,13 +13,13 @@ MODEL:
     FPN_POST_NMS_TOP_N_TEST: 1000
   ROI_HEADS:
     USE_FPN: True
-    BATCH_SIZE_PER_IMAGE: 256
   ROI_BOX_HEAD:
     POOLER_RESOLUTION: 7
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
     POOLER_SAMPLING_RATIO: 2
     FEATURE_EXTRACTOR: "FPN2MLPFeatureExtractor"
     PREDICTOR: "FPNPredictor"
+    NUM_CLASSES: 2
   ROI_MASK_HEAD:
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
     FEATURE_EXTRACTOR: "MaskRCNNFPNFeatureExtractor"
@@ -29,24 +28,30 @@ MODEL:
     POOLER_SAMPLING_RATIO: 2
     RESOLUTION: 28
     SHARE_BOX_FEATURE_EXTRACTOR: False
+    LOSS: "Balanced"
   MASK_ON: True
-DATASETS:
-  TRAIN: ("coco_2014_minival",)
-  TEST: ("coco_2014_minival",)
 INPUT:
-  MIN_SIZE_TRAIN: 600
-  MAX_SIZE_TRAIN: 1000
-  MIN_SIZE_TEST: 800
-  MAX_SIZE_TEST: 1000
+  PIXEL_MEAN: [122.7175, 120.6902, 117.5148]
+DATASETS:
+  TRAIN: ("DAVIS_train_instance_id",)
+  TEST: ("DAVIS_valid_instance_id",)
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 SOLVER:
-  BASE_LR: 0.005
+  BASE_LR: 0.00025
   WEIGHT_DECAY: 0.0001
-  STEPS: (1500,)
-  MAX_ITER: 2000
-  IMS_PER_BATCH: 4
-TEST:
+  STEPS: [0, 15000]
+  MAX_ITER: 20000
+  CHECKPOINT_PERIOD: 2000
+  VALIDATION_PERIOD: 2000
   IMS_PER_BATCH: 2
+TRAIN:
+  USE_GT_BOX: False
+TEST:
+  IMS_PER_BATCH: 1
+  DEBUG: False
+  OVERLAY_BOX: False
+  MATCHING: False
+
 EXP:
-  NAME: "Test COCO"
+  NAME: "Train_DAVIS_0.00025_20k_from_coco2014_680k_baseline_balanced_loss_pos_weight"

@@ -56,6 +56,16 @@ class DatasetCatalog(object):
         "DAVIS_valid": (
             "DAVIS",
             "DAVIS/Annotations/instancesonly_480p_val.json",
+        ),
+
+        "DAVIS_train_instance_id": (
+            "DAVIS",
+            "DAVIS/Annotations/instancesonly_480p_train_instance_id.json",
+        ),
+
+        "DAVIS_valid_instance_id": (
+            "DAVIS",
+            "DAVIS/Annotations/instancesonly_480p_val_instance_id.json",
         )
     }
 
@@ -72,7 +82,7 @@ class DatasetCatalog(object):
                 factory="COCODataset",
                 args=args,
             )
-        elif "DAVIS" in name:
+        elif "DAVIS" in name and "instance_id" not in name:
             data_dir = DatasetCatalog.DATA_DIR
             attrs = DatasetCatalog.DATASETS[name]
             args = dict(
@@ -83,6 +93,18 @@ class DatasetCatalog(object):
                 factory="DAVISDataset",
                 args=args,
             )
+        elif "DAVIS" in name and "instance_id" in name:
+            data_dir = DatasetCatalog.DATA_DIR
+            attrs = DatasetCatalog.DATASETS[name]
+            args = dict(
+                root=os.path.join(data_dir, attrs[0]),
+                ann_file=os.path.join(data_dir, attrs[1]),
+            )
+            return dict(
+                factory="DAVISDatasetAddInstanceID",
+                args=args,
+            )
+
         raise RuntimeError("Dataset not available: {}".format(name))
 
 
