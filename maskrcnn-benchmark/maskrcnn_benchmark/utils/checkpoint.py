@@ -20,7 +20,7 @@ class Checkpointer(object):
         save_to_disk=None,
         logger=None,
         num_class=81,
-        finetune_class_layer=False,
+        load_type="Default",
 
     ):
         self.model = model
@@ -32,7 +32,11 @@ class Checkpointer(object):
         if logger is None:
             logger = logging.getLogger(__name__)
         self.logger = logger
-        self.finetune_class_layer = finetune_class_layer
+        self.load_type = load_type
+
+        self._LOAD_TYPE = {"Default": self._load_model,
+                      "ExceptClassificationLayer": self._load_model_except_class_layer,
+                      "ExceptMaskBranch": self._load_model_except_mask_branch, }
 
     def save(self, name, **kwargs):
         if not self.save_dir:
@@ -54,6 +58,10 @@ class Checkpointer(object):
         torch.save(data, save_file)
         self.tag_last_checkpoint(save_file)
 
+    def select_load_type(self):
+        func = self._LOAD_TYPE[self.load_type]
+        return func
+
     def load(self, f=None):
         # if self.has_checkpoint():
         #     # override argument with existing checkpoint
@@ -64,13 +72,9 @@ class Checkpointer(object):
         #     return {}
         self.logger.info("Loading checkpoint from {}".format(f))
         checkpoint = self._load_file(f)
-        # self._load_model(checkpoint)
 
-        if self.finetune_class_layer:
-            self._load_model_except_class_layer(checkpoint)
-        else:
-            self._load_model(checkpoint)
-
+        f = self.select_load_type()
+        f(checkpoint)
 
         if "optimizer" in checkpoint and self.optimizer:
             self.logger.info("Loading optimizer from {}".format(f))
@@ -131,6 +135,21 @@ class Checkpointer(object):
             print('.'.join(i_parts))
         load_state_dict(self.model, new_params)
 
+    def _load_model_except_mask_branch(self, checkpoint):
+        if "model" in checkpoint:
+            saved_state_dict = checkpoint['model']
+        else:
+            saved_state_dict = checkpoint
+        new_params = self.model.state_dict().copy()
+        for i in saved_state_dict:
+            # 'module.roi_heads.mask.xx'
+            i_parts = i.split('.')
+            if i_parts[2] == 'mask':
+                continue
+            new_params['.'.join(i_parts)] = saved_state_dict[i]
+            print('.'.join(i_parts))
+        load_state_dict(self.model, new_params)
+
     def _load_model_part(self, saved_state_dict, name='backbone'):
         for i in saved_state_dict:
             # ''module.backbone.body.stem.conv1.weight'
@@ -154,10 +173,6 @@ class Checkpointer(object):
             saved_state_dict = checkpoint
         self._load_model_part(saved_state_dict, name='backbone')
         self._load_model_part(saved_state_dict, name='rpn')
-
-
-
-
 
 
     def check_shape_of_checkpoints(self, checkpoint):

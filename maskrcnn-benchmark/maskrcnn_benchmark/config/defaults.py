@@ -177,6 +177,7 @@ _C.MODEL.ROI_HEADS.DETECTIONS_PER_IMG = 30
 _C.MODEL.ROI_BOX_HEAD = CN()
 _C.MODEL.ROI_BOX_HEAD.FEATURE_EXTRACTOR = "ResNet50Conv5ROIFeatureExtractor"
 _C.MODEL.ROI_BOX_HEAD.PREDICTOR = "FastRCNNPredictor"
+_C.MODEL.ROI_BOX_HEAD.POOLER = "FPN_original_pooler"
 _C.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION = 14
 _C.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO = 0
 _C.MODEL.ROI_BOX_HEAD.POOLER_SCALES = (1.0 / 16,)
@@ -188,6 +189,7 @@ _C.MODEL.ROI_BOX_HEAD.MLP_HEAD_DIM = 1024
 _C.MODEL.ROI_MASK_HEAD = CN()
 _C.MODEL.ROI_MASK_HEAD.FEATURE_EXTRACTOR = "ResNet50Conv5ROIFeatureExtractor"
 _C.MODEL.ROI_MASK_HEAD.PREDICTOR = "MaskRCNNC4Predictor"
+_C.MODEL.ROI_MASK_HEAD.POOLER = "FPN_original_pooler"
 _C.MODEL.ROI_MASK_HEAD.POOLER_RESOLUTION = 14
 _C.MODEL.ROI_MASK_HEAD.POOLER_SAMPLING_RATIO = 0
 _C.MODEL.ROI_MASK_HEAD.POOLER_SCALES = (1.0 / 16,)
@@ -224,6 +226,15 @@ _C.MODEL.RESNETS.RES5_DILATION = 1
 
 _C.MODEL.RESNETS.RES2_OUT_CHANNELS = 256
 _C.MODEL.RESNETS.STEM_OUT_CHANNELS = 64
+
+
+# ---------------------------------------------------------------------------- #
+# Checkpointer
+# ---------------------------------------------------------------------------- #
+_C.CHECKPOINTER = CN()
+_C.CHECKPOINTER.NAME = "Checkpointer" # or DetectronCheckpointer
+_C.CHECKPOINTER.TYPE = "Default"
+
 
 # ---------------------------------------------------------------------------- #
 # Solver

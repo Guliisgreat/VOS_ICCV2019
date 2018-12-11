@@ -11,6 +11,7 @@ from . import samplers
 
 from .collate_batch import BatchCollator
 from .transforms import build_transforms
+from maskrcnn_benchmark.utils.checkpoint import DetectronCheckpointer, Checkpointer
 
 
 def build_dataset(dataset_list, transforms, dataset_catalog, is_train=True):
@@ -173,3 +174,21 @@ def make_data_loader(cfg, is_train=True, is_distributed=False, start_iter=0):
         assert len(data_loaders) == 1
         return data_loaders[0]
     return data_loaders
+
+
+def build_checkpointer(cfg, model, optimizer, scheduler, output_dir, save_to_disk):
+    if cfg.CHECKPOINTER.NAME == "Checkpointer":
+        checkpointer = Checkpointer(model,
+                                    save_dir=output_dir,
+                                    save_to_disk=save_to_disk,
+                                    num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES,
+                                    load_type=cfg.CHECKPOINTER.TYPE,)
+    elif cfg.CHECKPOINTER.NAME == "DetectronCheckpointer":
+        checkpointer = DetectronCheckpointer(
+            cfg, model, optimizer, scheduler, output_dir, save_to_disk
+        )
+    else:
+        raise Exception
+
+    return checkpointer
+

@@ -78,5 +78,61 @@ class ROIMaskHead(torch.nn.Module):
         return x, all_proposals, dict(loss_mask=loss_mask)
 
 
+class ROIParallelMaskHead(torch.nn.Module):
+    def __init__(self, cfg):
+        super(ROIMaskHead, self).__init__()
+        self.cfg = cfg.clone()
+        self.feature_extractor = make_roi_mask_feature_extractor(cfg)
+        self.predictor = make_roi_mask_predictor(cfg)
+        self.post_processor = make_roi_mask_post_processor(cfg)
+        self.loss_evaluator = make_roi_mask_loss_evaluator(cfg)
+
+    def forward(self, features, proposals, targets=None):
+        """
+        Arguments:
+            features (list[Tensor]): feature-maps from possibly several levels
+            proposals (list[BoxList]): proposal boxes
+            targets (list[BoxList], optional): the ground-truth targets.
+
+        Returns:
+            x (Tensor): the result of the feature extractor
+            proposals (list[BoxList]): during training, the original proposals
+                are returned. During testing, the predicted boxlists are returned
+                with the `mask` field set
+            losses (dict[Tensor]): During training, returns the losses for the
+                head. During testing, returns an empty dict.
+        """
+
+        if self.training:
+            # during training, only focus on positive boxes
+            all_proposals = proposals
+            proposals, positive_inds = keep_only_positive_boxes(proposals)
+
+
+        for each_level_feature in features:
+            x = self.feature_extractor(features, proposals)
+            mask_logits = self.predictor(x)
+
+
+
+
+
+        if not self.training:
+            result = self.post_processor(mask_logits, proposals)
+            return x, result, {}
+
+        loss_mask = self.loss_evaluator(proposals, mask_logits, targets)
+
+        return x, all_proposals, dict(loss_mask=loss_mask)
+
+
+
+
+
 def build_roi_mask_head(cfg):
     return ROIMaskHead(cfg)
+
+
+
+
+

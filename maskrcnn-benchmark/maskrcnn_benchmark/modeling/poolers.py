@@ -120,3 +120,98 @@ class Pooler(nn.Module):
             result[idx_in_level] = pooler(per_level_feature, rois_per_level)
 
         return result
+
+
+class IndividualPooler(nn.Module):
+    """
+    Pooler for Detection with or FPN.
+    In original FPN Pooler, each ROI proposal will choose one level of feature grid.
+    However, in FPN Individual Pooler, each ROI proposal will keep all levels of its
+    corresponding feature grid
+    """
+
+    def __init__(self, output_size, scales, sampling_ratio):
+        """
+        Arguments:
+            output_size (list[tuple[int]] or list[int]): output size for the pooled region
+            scales (list[flaot]): scales for each Pooler
+            sampling_ratio (int): sampling ratio for ROIAlign
+        """
+        super(IndividualPooler, self).__init__()
+        poolers = []
+        for scale in scales:
+            poolers.append(
+                ROIAlign(
+                    output_size, spatial_scale=scale, sampling_ratio=sampling_ratio
+                )
+            )
+        self.poolers = nn.ModuleList(poolers)
+        self.output_size = output_size
+        # get the levels in the feature map by leveraging the fact that the network always
+        # downsamples by a factor of 2 at each level.
+
+
+    def convert_to_roi_format(self, boxes):
+        concat_boxes = cat([b.bbox for b in boxes], dim=0)
+        device, dtype = concat_boxes.device, concat_boxes.dtype
+        ids = cat(
+            [
+                torch.full((len(b), 1), i, dtype=dtype, device=device)
+                for i, b in enumerate(boxes)
+            ],
+            dim=0,
+        )
+        rois = torch.cat([ids, concat_boxes], dim=1)
+        return rois
+
+    def forward(self, x, boxes):
+        """
+        Arguments:
+            x (list[Tensor]): feature maps for each level
+            boxes (list[BoxList]): boxes to be used to perform the pooling operation.
+        Returns:
+            result (Tensor)
+        """
+        num_levels = len(self.poolers)
+        rois = self.convert_to_roi_format(boxes)
+        if num_levels == 1:
+            return self.poolers[0](x[0], rois)
+
+        num_rois = len(rois)
+        num_channels = x[0].shape[1] # 256
+        output_size = self.output_size[0]
+
+        dtype, device = x[0].dtype, x[0].device
+
+
+        result = []
+
+        for per_level_feature, pooler in zip(x, self.poolers):
+            result_level = pooler(per_level_feature, rois).type(dtype).to(device)
+            result.append(result_level)
+
+        return result
+
+
+_POOLER_TYPE = {"FPN_original_pooler": Pooler,
+                "FPN_individual_level_pooler": IndividualPooler,
+                }
+
+
+def make_box_pooler(cfg):
+    func = _POOLER_TYPE[cfg.MODEL.ROI_BOX_HEAD.POOLER]
+    resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
+    scales = cfg.MODEL.ROI_BOX_HEAD.POOLER_SCALES
+    sampling_ratio = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
+    output_size = (resolution, resolution)
+    return func(output_size, scales, sampling_ratio)
+
+
+def make_mask_pooler(cfg):
+    func = _POOLER_TYPE[cfg.MODEL.ROI_MASK_HEAD.POOLER]
+    resolution = cfg.MODEL.ROI_MASK_HEAD.POOLER_RESOLUTION
+    scales = cfg.MODEL.ROI_MASK_HEAD.POOLER_SCALES
+    sampling_ratio = cfg.MODEL.ROI_MASK_HEAD.POOLER_SAMPLING_RATIO
+    output_size = (resolution, resolution)
+    return func(output_size, scales, sampling_ratio)
+

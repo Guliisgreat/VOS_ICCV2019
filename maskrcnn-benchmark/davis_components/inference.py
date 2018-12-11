@@ -88,10 +88,11 @@ def vote_pixel_of_mask_for_annotation(masks, prediction, threshold=0.5):
     scores = prediction.get_field("scores").numpy()
     masks = masks.numpy()
 
-    threshold = adaptive_threshold(masks, threshold)
+    # threshold = adaptive_threshold(masks, threshold)
 
 
-    instance_scores = np.array([score * mask for score, mask in zip(scores, masks)])
+    # instance_scores = np.array([score * mask for score, mask in zip(scores, masks)])
+    instance_scores = masks
     instance_scores = ((masks > threshold) + 0) * instance_scores
     background_scores = np.expand_dims(np.zeros(np.array(instance_scores).shape[1:]), axis=0)
     pixel_scores = np.concatenate((background_scores, instance_scores), axis=0)
@@ -110,15 +111,20 @@ def vote_pixel_of_mask_for_annotation(masks, prediction, threshold=0.5):
 def assign_template_instance_id(annotation, instance_ids):
     obj_list = list(np.unique(annotation))
     obj_list.pop(0)
-    # if len(obj_list) != len(instance_ids):
-    #     a =1
-    # assert len(obj_list) == len(instance_ids), \
-    #     "the number of objects in the prediction " \
-    #     "is not matched with that in the template"
+    if len(obj_list) != len(instance_ids):
+        a =1
+    assert len(obj_list) == len(instance_ids), \
+        "the number of objects in the prediction " \
+        "is not matched with that in the template"
+    assigned_annotation = np.zeros(annotation.shape)
     for obj in obj_list:
         instance_id = instance_ids[obj-1]
-        np.place(annotation, annotation == obj, instance_id)
-    return annotation
+        assigned_annotation += (annotation == obj).astype(int) * instance_id
+
+    assert len(obj_list) == len(np.unique(assigned_annotation))-1, \
+        "the number of objects in the prediction " \
+        "is not matched with that in the template"
+    return assigned_annotation
 
 
 def adaptive_threshold(masks, threshold):
@@ -127,9 +133,7 @@ def adaptive_threshold(masks, threshold):
          and will show in the final annotation
 
     """
-    for mask in masks:
-        if mask.max() < threshold:
-            threshold = mask.max()
+
     return threshold
 
 

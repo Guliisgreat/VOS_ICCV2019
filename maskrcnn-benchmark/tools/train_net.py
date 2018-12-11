@@ -13,6 +13,7 @@ import os
 import torch
 from maskrcnn_benchmark.config import cfg
 from maskrcnn_benchmark.data import make_data_loader
+from maskrcnn_benchmark.data.build import build_checkpointer
 from maskrcnn_benchmark.solver import make_lr_scheduler
 from maskrcnn_benchmark.solver import make_optimizer
 from maskrcnn_benchmark.engine.inference import inference
@@ -24,6 +25,7 @@ from maskrcnn_benchmark.utils.comm import synchronize
 from maskrcnn_benchmark.utils.imports import import_file
 from maskrcnn_benchmark.utils.logging import setup_logger
 from maskrcnn_benchmark.utils.miscellaneous import mkdir
+from utils_davis import tools
 
 
 def train(cfg, local_rank, distributed):
@@ -44,18 +46,19 @@ def train(cfg, local_rank, distributed):
     arguments = {}
     arguments["iteration"] = 0
 
-
-    output_dir = cfg.OUTPUT_DIR
+    exp_name = cfg.EXP.NAME
+    output_dir = tools.get_exp_output_dir(exp_name, cfg.OUTPUT_DIR)
 
     save_to_disk = local_rank == 0
     # checkpointer = DetectronCheckpointer(
     #     cfg, model, optimizer, scheduler, output_dir, save_to_disk
     # )
-    checkpointer = Checkpointer(model,
-                                save_dir=output_dir,
-                                save_to_disk=save_to_disk,
-                                num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES,
-                                finetune_class_layer=False,)
+    # # checkpointer = Checkpointer(model,
+    # #                             save_dir=output_dir,
+    # #                             save_to_disk=save_to_disk,
+    # #                             num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES,
+    # #                             load_type=cfg,)
+    checkpointer = build_checkpointer(cfg, model, optimizer, scheduler, output_dir, save_to_disk)
     extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
     arguments.update(extra_checkpoint_data)
 
@@ -69,7 +72,7 @@ def train(cfg, local_rank, distributed):
 
     checkpoint_period = cfg.SOLVER.CHECKPOINT_PERIOD
     validation_period = cfg.SOLVER.VALIDATION_PERIOD
-    exp_name = cfg.EXP.NAME
+
     if cfg.TEST.SKIP_TRAIN:
         print("Skip Training...")
         return model

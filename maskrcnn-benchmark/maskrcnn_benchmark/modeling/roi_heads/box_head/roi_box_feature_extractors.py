@@ -1,9 +1,10 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
+import torch
 from torch import nn
 from torch.nn import functional as F
 
 from maskrcnn_benchmark.modeling.backbone import resnet
-from maskrcnn_benchmark.modeling.poolers import Pooler
+from maskrcnn_benchmark.modeling.poolers import Pooler, make_box_pooler
 
 
 class ResNet50Conv5ROIFeatureExtractor(nn.Module):
@@ -50,14 +51,15 @@ class FPN2MLPFeatureExtractor(nn.Module):
         resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
         scales = cfg.MODEL.ROI_BOX_HEAD.POOLER_SCALES
         sampling_ratio = cfg.MODEL.ROI_BOX_HEAD.POOLER_SAMPLING_RATIO
-        pooler = Pooler(
-            output_size=(resolution, resolution),
-            scales=scales,
-            sampling_ratio=sampling_ratio,
-        )
+        # pooler = Pooler(
+        #     output_size=(resolution, resolution),
+        #     scales=scales,
+        #     sampling_ratio=sampling_ratio,
+        # )
+        self.pooler = make_box_pooler(cfg)
         input_size = cfg.MODEL.BACKBONE.OUT_CHANNELS * resolution ** 2
         representation_size = cfg.MODEL.ROI_BOX_HEAD.MLP_HEAD_DIM
-        self.pooler = pooler
+        self.pooler = make_box_pooler(cfg)
         self.fc6 = nn.Linear(input_size, representation_size)
         self.fc7 = nn.Linear(representation_size, representation_size)
 
@@ -77,9 +79,53 @@ class FPN2MLPFeatureExtractor(nn.Module):
         return x
 
 
+class FPNAdaptiveFeaturePoolingPFeatureExtractor(nn.Module):
+    """
+    Heads for FPN for classification
+    """
+
+    def __init__(self, cfg):
+        super(FPNAdaptiveFeaturePoolingPFeatureExtractor, self).__init__()
+
+        resolution = cfg.MODEL.ROI_BOX_HEAD.POOLER_RESOLUTION
+        input_size = cfg.MODEL.BACKBONE.OUT_CHANNELS * resolution ** 2
+        representation_size = cfg.MODEL.ROI_BOX_HEAD.MLP_HEAD_DIM
+        self.pooler = make_box_pooler(cfg)
+
+        parallel_layers = (representation_size, representation_size, representation_size, representation_size)
+        self.parallel_block = []
+        for layer_idx, layer_features in enumerate(parallel_layers, 1):
+            layer_name = "box_fc6_parallel{}".format(layer_idx)
+            module = nn.Linear(input_size, layer_features)
+            nn.init.kaiming_uniform_(module.weight, a=1)
+            nn.init.constant_(module.bias, 0)
+            self.add_module(layer_name, module)
+            self.parallel_block.append(layer_name)
+
+        self.fc7 = nn.Linear(representation_size, representation_size)
+        nn.init.kaiming_uniform_(self.fc7.weight, a=1)
+        nn.init.constant_(self.fc7.bias, 0)
+
+    def forward(self, x, proposals):
+        x = self.pooler(x, proposals)
+        # FC6 for each level of Feature grid
+        for idx, layer_name in enumerate(self.parallel_block):
+            x[idx] = x[idx].view(x.size(0), -1)
+            x[idx] = F.relu(getattr(self, layer_name)(x[idx]))
+        # Fusion (max)
+        for i in range(1, len(x)):
+            x[0] = torch.max(x[0], x[i])
+        x = x[0]
+
+        x = F.relu(self.fc7(x))
+
+        return x
+
+
 _ROI_BOX_FEATURE_EXTRACTORS = {
     "ResNet50Conv5ROIFeatureExtractor": ResNet50Conv5ROIFeatureExtractor,
     "FPN2MLPFeatureExtractor": FPN2MLPFeatureExtractor,
+    "FPNAdaptiveFeaturePoolingPFeatureExtractor": FPNAdaptiveFeaturePoolingPFeatureExtractor,
 }
 
 

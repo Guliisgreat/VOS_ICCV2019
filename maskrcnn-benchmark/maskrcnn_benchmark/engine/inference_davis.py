@@ -214,6 +214,10 @@ def generate_davis_final_annotation(predictions, dataset, output_file, annotatio
 
         video_id = dataset.get_annotation_video_id(id)
         img_id = dataset.get_annotation_img_id(id)
+
+        if video_id == "scooter-black" and img_id == "00012":
+            a = 1
+
         palette = dataset.get_annotation_palette(id)
         image_width = dataset.get_img_width(id)
         image_height = dataset.get_img_height(id)
@@ -675,12 +679,12 @@ def inference_davis(
             predictions = select_top_predictions(predictions, confidence_score=0.3)
             torch.save(predictions, os.path.join(output_folder, "select_predictions.pth"))
 
-    # if overlay_box:
-    #     with tools.TimerBlock("Overlay boxes...", logger) as block:
-    #         dirname = os.path.join(output_folder, "overlay_box_results_no_matched")
-    #         if not os.path.exists(dirname):
-    #             os.mkdir(dirname)
-    #         overlay_boxes_on_predictions(predictions, dataset, dirname)
+    if overlay_box:
+        with tools.TimerBlock("Overlay boxes...", logger) as block:
+            dirname = os.path.join(output_folder, "overlay_box_results_no_matched")
+            if not os.path.exists(dirname):
+                os.mkdir(dirname)
+            overlay_boxes_on_predictions(predictions, dataset, dirname)
     #
     # if generate_annotation:
     #     with tools.TimerBlock("Generate final no_matched annotation...", logger) as block:
