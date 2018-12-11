@@ -28,7 +28,7 @@ MODEL:
     POOLER_SAMPLING_RATIO: 2
     RESOLUTION: 28
     SHARE_BOX_FEATURE_EXTRACTOR: False
-#    LOSS: "Balanced"
+    LOSS: "Balanced"
   MASK_ON: True
 INPUT:
   PIXEL_MEAN: [122.7175, 120.6902, 117.5148]
@@ -54,4 +54,4 @@ TEST:
   MATCHING: False
 
 EXP:
-  NAME: "Train_DAVIS_0.00005_2GPUS_baseline"
+  NAME: "Train_DAVIS_0.00005_2GPUS_baseline_balancedloss"
