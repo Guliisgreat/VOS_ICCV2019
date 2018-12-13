@@ -4,7 +4,7 @@ from torch import nn
 
 from maskrcnn_benchmark.structures.bounding_box import BoxList
 
-from .roi_mask_feature_extractors import make_roi_mask_feature_extractor
+from .roi_mask_feature_extractors import make_roi_mask_feature_extractor, make_PANet_mask_branch
 from .roi_mask_predictors import make_roi_mask_predictor
 from .inference import make_roi_mask_post_processor
 from .loss import make_roi_mask_loss_evaluator
@@ -78,12 +78,11 @@ class ROIMaskHead(torch.nn.Module):
         return x, all_proposals, dict(loss_mask=loss_mask)
 
 
-class ROIParallelMaskHead(torch.nn.Module):
+class PANetMaskHead(torch.nn.Module):
     def __init__(self, cfg):
-        super(ROIMaskHead, self).__init__()
+        super(PANetMaskHead, self).__init__()
         self.cfg = cfg.clone()
-        self.feature_extractor = make_roi_mask_feature_extractor(cfg)
-        self.predictor = make_roi_mask_predictor(cfg)
+        self.predictor = make_PANet_mask_branch(cfg)
         self.post_processor = make_roi_mask_post_processor(cfg)
         self.loss_evaluator = make_roi_mask_loss_evaluator(cfg)
 
@@ -108,15 +107,8 @@ class ROIParallelMaskHead(torch.nn.Module):
             all_proposals = proposals
             proposals, positive_inds = keep_only_positive_boxes(proposals)
 
-
-        for each_level_feature in features:
-            x = self.feature_extractor(features, proposals)
-            mask_logits = self.predictor(x)
-
-
-
-
-
+        x, mask_logits = self.predictor(features, proposals)
+        # FC branch
         if not self.training:
             result = self.post_processor(mask_logits, proposals)
             return x, result, {}
@@ -128,9 +120,13 @@ class ROIParallelMaskHead(torch.nn.Module):
 
 
 
+_HEAD = {"ROIMaskHead": ROIMaskHead,
+        "PANetMaskHead": PANetMaskHead}
+
 
 def build_roi_mask_head(cfg):
-    return ROIMaskHead(cfg)
+    func = _HEAD[cfg.MODEL.ROI_MASK_HEAD.NAME ]
+    return func(cfg)
 
 
 

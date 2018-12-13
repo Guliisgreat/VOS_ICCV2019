@@ -1,6 +1,6 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/output/Train_DAVIS_0.00005_2GPUS_baseline_balancedloss/model_0006000.pth"
+  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/output/Train_DAVIS_0.00005_2GPUS_adaptiveFeaturePooling_fintune/model_0009000.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
     OUT_CHANNELS: 256
@@ -59,4 +59,4 @@ TEST:
   PAD_SIZE: 10
 
 EXP:
-  NAME: "DAVIS_baseline_balancedloss_6000"
+  NAME: "DAVIS_baseline_AdaptiveFeaturePooling_9000"

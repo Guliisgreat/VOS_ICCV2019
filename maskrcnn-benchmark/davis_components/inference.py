@@ -113,9 +113,10 @@ def assign_template_instance_id(annotation, instance_ids):
     obj_list.pop(0)
     if len(obj_list) != len(instance_ids):
         a =1
-    assert len(obj_list) == len(instance_ids), \
-        "the number of objects in the prediction " \
-        "is not matched with that in the template"
+        print("some instance in template does not exist in prediction")
+    # assert len(obj_list) == len(instance_ids), \
+    #     "the number of objects in the prediction " \
+    #     "is not matched with that in the template"
     assigned_annotation = np.zeros(annotation.shape)
     for obj in obj_list:
         instance_id = instance_ids[obj-1]

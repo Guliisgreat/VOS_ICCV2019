@@ -1,7 +1,7 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
 #  WEIGHT: "catalog://ImageNetPretrained/MSRA/R-50"
-  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/output/COCO_2017_binary_adaptiveFeaturePooling_maskbranch_train/model_0390000.pth"
+  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/pretrained_weight/model_0359999.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
     OUT_CHANNELS: 256
@@ -23,13 +23,13 @@ MODEL:
     NUM_CLASSES: 2
   ROI_MASK_HEAD:
     POOLER_SCALES: (0.25, 0.125, 0.0625, 0.03125)
-    FEATURE_EXTRACTOR: "MaskRCNNFPNAdaptiveFeaturePoolingExtractor"
     PREDICTOR: "MaskRCNNC4Predictor"
     POOLER_RESOLUTION: 14
     POOLER_SAMPLING_RATIO: 2
     RESOLUTION: 28
     SHARE_BOX_FEATURE_EXTRACTOR: False
     POOLER: "FPN_individual_level_pooler"
+    NAME: "PANetMaskHead"
   MASK_ON: True
 DATASETS:
    TRAIN: ("coco_2017_train_binary", )
@@ -37,17 +37,17 @@ DATASETS:
 DATALOADER:
   SIZE_DIVISIBILITY: 32
 CHECKPOINTER:
-#  TYPE: "ExceptMaskBranch"
-  TYPE: "Default"
+  TYPE: "ExceptMaskBranch"
+#  TYPE: "Default"
 SOLVER:
-  BASE_LR: 0.00025
+  BASE_LR: 0.0005
 #  BASE_LR: 0.000025
   WEIGHT_DECAY: 0.0001
-#  STEPS:  [320000, 360000, 400000]
+  STEPS:  [360000, 400000]
 
 #  STEPS:  [0, 240000, 320000]
 #  STEPS:  [80000, 100000, 120000]
-  MAX_ITER: 450000
+  MAX_ITER: 440000
 #  MAX_ITER: 150000
   CHECKPOINT_PERIOD: 10000
   VALIDATION_PERIOD: 10000
@@ -56,4 +56,4 @@ TEST:
   IMS_PER_BATCH: 2
   SKIP_TRAIN: False
 EXP:
-  NAME: "COCO_2017_binary_adaptiveFeaturePooling_maskbranch_train_400k"
+  NAME: "COCO_2017_binary_360k_PANetMaskBranch"

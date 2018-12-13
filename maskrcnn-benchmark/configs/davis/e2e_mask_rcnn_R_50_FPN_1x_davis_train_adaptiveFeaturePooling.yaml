@@ -1,6 +1,6 @@
 MODEL:
   META_ARCHITECTURE: "GeneralizedRCNN"
-  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/pretrained_weight/model_0359999.pth"
+  WEIGHT: "/home/guli/Desktop/VOS_ICCV2019/maskrcnn-benchmark/output/COCO_2017_binary_adaptiveFeaturePooling_maskbranch_train_400k/model_0410000.pth"
   BACKBONE:
     CONV_BODY: "R-50-FPN"
     OUT_CHANNELS: 256
@@ -54,4 +54,4 @@ TEST:
   MATCHING: False
 
 EXP:
-  NAME: "Train_DAVIS_0.00005_2GPUS_adaptiveFeaturePooling"
+  NAME: "Train_DAVIS_0.00005_2GPUS_adaptiveFeaturePooling_fintune"

@@ -52,7 +52,7 @@ def train(cfg, local_rank, distributed):
                                     save_dir=output_dir,
                                     save_to_disk=save_to_disk,
                                     num_class=cfg.MODEL.ROI_BOX_HEAD.NUM_CLASSES,
-                                    finetune_class_layer=False)
+                                    )
         extra_checkpoint_data = checkpointer.load(cfg.MODEL.WEIGHT)
         arguments.update(extra_checkpoint_data)
         arguments["iteration"] = 0

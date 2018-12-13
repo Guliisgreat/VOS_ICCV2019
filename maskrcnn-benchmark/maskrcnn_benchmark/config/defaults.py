@@ -198,6 +198,8 @@ _C.MODEL.ROI_MASK_HEAD.CONV_LAYERS = (256, 256, 256, 256)
 _C.MODEL.ROI_MASK_HEAD.RESOLUTION = 14
 _C.MODEL.ROI_MASK_HEAD.SHARE_BOX_FEATURE_EXTRACTOR = True
 _C.MODEL.ROI_MASK_HEAD.LOSS = "Unbalanced"
+_C.MODEL.ROI_MASK_HEAD.NAME = "ROIMaskHead"
+
 
 # ---------------------------------------------------------------------------- #
 # ResNe[X]t options (ResNets = {ResNet, ResNeXt}
