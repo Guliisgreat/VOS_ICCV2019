@@ -126,7 +126,11 @@ _HEAD = {"ROIMaskHead": ROIMaskHead,
 
 def build_roi_mask_head(cfg):
     func = _HEAD[cfg.MODEL.ROI_MASK_HEAD.NAME ]
-    return func(cfg)
+    model = func(cfg)
+    if cfg.MODEL.ROI_MASK_HEAD.FREEZE_WEIGHT:
+        for param in model.parameters():
+            param.requires_grad = False
+    return model
 
 
 

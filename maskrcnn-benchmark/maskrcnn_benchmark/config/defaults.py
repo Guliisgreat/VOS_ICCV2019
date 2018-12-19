@@ -92,12 +92,14 @@ _C.MODEL.BACKBONE.CONV_BODY = "R-50-C4"
 # Add StopGrad at a specified stage so the bottom layers are frozen
 _C.MODEL.BACKBONE.FREEZE_CONV_BODY_AT = 2
 _C.MODEL.BACKBONE.OUT_CHANNELS = 256 * 4
+_C.MODEL.BACKBONE.FREEZE_WEIGHT = False
 
 
 # ---------------------------------------------------------------------------- #
 # RPN options
 # ---------------------------------------------------------------------------- #
 _C.MODEL.RPN = CN()
+_C.MODEL.RPN.FREEZE_WEIGHT = False
 _C.MODEL.RPN.USE_FPN = False
 # Base RPN anchor sizes given in absolute pixels w.r.t. the scaled network input
 _C.MODEL.RPN.ANCHOR_SIZES = (32, 64, 128, 256, 512)
@@ -175,6 +177,7 @@ _C.MODEL.ROI_HEADS.DETECTIONS_PER_IMG = 30
 
 
 _C.MODEL.ROI_BOX_HEAD = CN()
+_C.MODEL.ROI_BOX_HEAD.FREEZE_WEIGHT = False
 _C.MODEL.ROI_BOX_HEAD.FEATURE_EXTRACTOR = "ResNet50Conv5ROIFeatureExtractor"
 _C.MODEL.ROI_BOX_HEAD.PREDICTOR = "FastRCNNPredictor"
 _C.MODEL.ROI_BOX_HEAD.POOLER = "FPN_original_pooler"
@@ -187,6 +190,7 @@ _C.MODEL.ROI_BOX_HEAD.MLP_HEAD_DIM = 1024
 
 
 _C.MODEL.ROI_MASK_HEAD = CN()
+_C.MODEL.ROI_MASK_HEAD.FREEZE_WEIGHT = False
 _C.MODEL.ROI_MASK_HEAD.FEATURE_EXTRACTOR = "ResNet50Conv5ROIFeatureExtractor"
 _C.MODEL.ROI_MASK_HEAD.PREDICTOR = "MaskRCNNC4Predictor"
 _C.MODEL.ROI_MASK_HEAD.POOLER = "FPN_original_pooler"
@@ -287,6 +291,7 @@ _C.TEST.SKIP_NETWORK = False
 _C.TEST.SELECT_TOP_PREDICTIONS = False
 _C.TEST.PAD_BOX = False
 _C.TEST.PAD_SIZE = 0
+_C.TEST.USE_GT_BOX = False
 
 # ---------------------------------------------------------------------------- #
 # Specific Train options

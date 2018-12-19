@@ -36,7 +36,8 @@ class Checkpointer(object):
 
         self._LOAD_TYPE = {"Default": self._load_model,
                       "ExceptClassificationLayer": self._load_model_except_class_layer,
-                      "ExceptMaskBranch": self._load_model_except_mask_branch, }
+                      "ExceptMaskBranch": self._load_model_except_mask_branch,
+                      "ExceptBoxBranch": self._load_model_except_box_branch,}
 
     def save(self, name, **kwargs):
         if not self.save_dir:
@@ -145,6 +146,21 @@ class Checkpointer(object):
             # 'module.roi_heads.mask.xx'
             i_parts = i.split('.')
             if i_parts[2] == 'mask':
+                continue
+            new_params['.'.join(i_parts)] = saved_state_dict[i]
+            print('.'.join(i_parts))
+        load_state_dict(self.model, new_params)
+
+    def _load_model_except_box_branch(self, checkpoint):
+        if "model" in checkpoint:
+            saved_state_dict = checkpoint['model']
+        else:
+            saved_state_dict = checkpoint
+        new_params = self.model.state_dict().copy()
+        for i in saved_state_dict:
+            # 'module.roi_heads.box.xx'
+            i_parts = i.split('.')
+            if i_parts[2] == 'box':
                 continue
             new_params['.'.join(i_parts)] = saved_state_dict[i]
             print('.'.join(i_parts))

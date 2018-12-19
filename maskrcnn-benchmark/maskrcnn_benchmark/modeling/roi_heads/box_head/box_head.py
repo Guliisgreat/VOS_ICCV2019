@@ -63,10 +63,16 @@ class ROIBoxHead(torch.nn.Module):
         )
 
 
+
 def build_roi_box_head(cfg):
     """
     Constructs a new box head.
     By default, uses ROIBoxHead, but if it turns out not to be enough, just register a new class
     and make it a parameter in the config
     """
-    return ROIBoxHead(cfg)
+    model = ROIBoxHead(cfg)
+    if cfg.MODEL.ROI_BOX_HEAD.FREEZE_WEIGHT:
+        for param in model.parameters():
+            param.requires_grad = False
+
+    return model

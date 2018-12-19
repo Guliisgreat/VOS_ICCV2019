@@ -136,4 +136,9 @@ def build_rpn(cfg):
     """
     This gives the gist of it. Not super important because it doesn't change as much
     """
-    return RPNModule(cfg)
+    model = RPNModule(cfg)
+    if cfg.MODEL.RPN.FREEZE_WEIGHT:
+        for param in model.parameters():
+            param.requires_grad = False
+
+    return model

@@ -28,6 +28,11 @@ def build_resnet_fpn_backbone(cfg):
         top_blocks=fpn_module.LastLevelMaxPool(),
     )
     model = nn.Sequential(OrderedDict([("body", body), ("fpn", fpn)]))
+
+    if cfg.MODEL.BACKBONE.FREEZE_WEIGHT:
+        for param in model.parameters():
+            param.requires_grad = False
+
     return model
 
 
