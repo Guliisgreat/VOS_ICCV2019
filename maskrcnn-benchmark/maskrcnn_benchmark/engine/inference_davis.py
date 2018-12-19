@@ -51,6 +51,30 @@ def compute_on_dataset(model, data_loader, device, debug):
     return results_dict
 
 
+def compute_on_dataset_with_gt(model, data_loader, device, debug):
+    model.eval()
+    results_dict = {}
+    cpu_device = torch.device("cpu")
+    for i, batch in tqdm(enumerate(data_loader)):
+        if i == 181:
+            a =1
+
+        if debug:
+            if i > 10:
+                break
+
+        images, targets, image_ids = batch
+        images = images.to(device)
+        targets = [target.to(device) for target in targets]
+        with torch.no_grad():
+            output = model(images, targets)
+            output = [o.to(cpu_device) for o in output]
+        results_dict.update(
+            {img_id: result for img_id, result in zip(image_ids, output)}
+        )
+    return results_dict
+
+
 def matching_instance_with_gt_template(data_loader, predictions, debug):
     matcher = InstanceMatcher(iou_type='bbox')
     matched_prediction = []
@@ -646,7 +670,7 @@ def inference_davis(
     if not skip_computation_network:
         logger.info("Start evaluation on {} images".format(len(dataset)))
         start_time = time.time()
-        predictions = compute_on_dataset(model, data_loader, device, debug)
+        predictions = compute_on_dataset_with_gt(model, data_loader, device, debug)
         # wait for all processes to complete before measuring the time
         synchronize()
         total_time = time.time() - start_time
