@@ -93,6 +93,7 @@ def main():
             matching=cfg.TEST.MATCHING,
             skip_computation_network=cfg.TEST.SKIP_NETWORK,
             select_top_predictions_flag=cfg.TEST.SELECT_TOP_PREDICTIONS,
+            cfg=cfg
         )
         synchronize()
 

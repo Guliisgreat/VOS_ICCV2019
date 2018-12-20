@@ -27,6 +27,12 @@ from utils_davis.visualization import overlay_boxes, select_top_boxes_from_predi
 from utils_davis import tools
 from utils_davis.evaluation import davis_toolbox_evaluation
 
+from maskrcnn_benchmark.utils.metric_logger import MetricLogger
+from maskrcnn_benchmark.engine.trainer import reduce_loss_dict
+
+from maskrcnn_benchmark.solver import make_lr_scheduler
+from maskrcnn_benchmark.solver import make_optimizer
+
 
 def compute_on_dataset(model, data_loader, device, debug):
     model.eval()
@@ -49,6 +55,76 @@ def compute_on_dataset(model, data_loader, device, debug):
             {img_id: result for img_id, result in zip(image_ids, output)}
         )
     return results_dict
+
+
+def comput_on_dataset_with_finetune(model, data_loader, device, cfg):
+    results_dict = {}
+    cpu_device = torch.device("cpu")
+    optimizer = make_optimizer(cfg, model)
+    scheduler = make_lr_scheduler(cfg, optimizer)
+
+    for i, batch in tqdm(enumerate(data_loader)):
+        # assert len(batch[0]) == 1, "Finetune only Support batchsize = 1"
+
+        dataset = data_loader.dataset
+        video_id = dataset.get_annotation_video_id(i)
+        img_id = dataset.get_annotation_img_id(i)
+
+        images, targets, image_ids = batch
+        images = images.to(device)
+        targets = [target.to(device) for target in targets]
+
+        if img_id == "00000":
+            logger = logging.getLogger("DAVIS_MaskRCNN_baseline_test")
+            logger.info('-' * 50)
+            logger.info("Fintune: {}".format(video_id))
+            logger.info('-' * 50)
+            model = finetune_first_image(model, images, targets, optimizer, scheduler, logger, cfg)
+
+        model.eval()
+        with torch.no_grad():
+            output = model(images)
+            output = [o.to(cpu_device) for o in output]
+        results_dict.update(
+            {img_id: result for img_id, result in zip(image_ids, output)}
+        )
+    return results_dict
+
+
+def finetune_first_image(model, images, targets, optimizer,scheduler, logger, cfg):
+    total_iter_finetune = cfg.FINETUNE.TOTAL_ITER
+    model.train()
+    meters = MetricLogger(delimiter="  ")
+    for iteration in range(total_iter_finetune):
+
+        scheduler.step()
+        loss_dict, _ = model(images, targets)
+        losses = sum(loss for loss in loss_dict.values())
+
+        # reduce losses over all GPUs for logging purposes
+        loss_dict_reduced = reduce_loss_dict(loss_dict)
+        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+        meters.update(total_loss=losses_reduced, **loss_dict_reduced)
+
+        optimizer.zero_grad()
+        losses.backward()
+        optimizer.step()
+
+        meters.update(lr=optimizer.param_groups[0]["lr"])
+
+        if iteration % (total_iter_finetune / 2) == 0 :
+            logger.info(
+                meters.delimiter.join(
+                    [
+                        "{meters}",
+                    ]
+                ).format(
+                    meters=str(meters),
+                )
+            )
+
+    model.eval()
+    return model
 
 
 def compute_on_dataset_with_gt(model, data_loader, device, debug):
@@ -655,6 +731,8 @@ def inference_davis(
     matching=False,
     skip_computation_network=False,
     select_top_predictions_flag = False,
+    cfg=None,
+
 
 ):
 
@@ -670,7 +748,10 @@ def inference_davis(
     if not skip_computation_network:
         logger.info("Start evaluation on {} images".format(len(dataset)))
         start_time = time.time()
-        predictions = compute_on_dataset_with_gt(model, data_loader, device, debug)
+        if cfg.FINETUNE.USE:
+            predictions = comput_on_dataset_with_finetune(model, data_loader, device, cfg)
+        else:
+            predictions = compute_on_dataset(model, data_loader, device, debug)
         # wait for all processes to complete before measuring the time
         synchronize()
         total_time = time.time() - start_time
