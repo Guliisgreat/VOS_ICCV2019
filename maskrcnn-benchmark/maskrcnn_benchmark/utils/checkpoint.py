@@ -52,6 +52,10 @@ class Checkpointer(object):
             data["optimizer"] = self.optimizer.state_dict()
         if self.scheduler is not None:
             data["scheduler"] = self.scheduler.state_dict()
+        # Important !!!!!:
+        # if we did not checkpoint.pop("model") when we load checkpoint,
+        # the initial checkpoint["model"] will be keeped and replaced the model
+        # after training, which means we did not save the model after training
         data.update(kwargs)
 
         save_file = os.path.join(self.save_dir, "{}.pth".format(name))
@@ -138,7 +142,7 @@ class Checkpointer(object):
 
     def _load_model_except_mask_branch(self, checkpoint):
         if "model" in checkpoint:
-            saved_state_dict = checkpoint['model']
+            saved_state_dict = checkpoint.pop('model')
         else:
             saved_state_dict = checkpoint
         new_params = self.model.state_dict().copy()
@@ -153,7 +157,7 @@ class Checkpointer(object):
 
     def _load_model_except_box_branch(self, checkpoint):
         if "model" in checkpoint:
-            saved_state_dict = checkpoint['model']
+            saved_state_dict = checkpoint.pop('model')
         else:
             saved_state_dict = checkpoint
         new_params = self.model.state_dict().copy()
